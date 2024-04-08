@@ -3,6 +3,11 @@
 ### Introduction
 Saturn.chat integrates the AutoGen framework to advance the development of Large Language Model (LLM) applications, creating a rich, interactive story environment. This technical document highlights the ongoing integration of AutoGen (developed by Microsoft) into Saturn.chat's platform. AutoGen enhances the conversational capabilities of LLMs, enabling a seamless integration of AI-driven narratives with user interactions in a unified narrative ecosystem.
 
+
+## Setup
+
+open the notebook, uncomment the pip install lines in the first notebook cell, run all the cells, and finallt interact with the bot
+
 ### Current Development Highlights
 
 - [ ] **Innovative Maze Navigation**
