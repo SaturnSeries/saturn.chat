@@ -6,8 +6,7 @@ Saturn.chat integrates the AutoGen framework to advance the development of Large
 
 ## Setup
 
-1. clone the repo1
-1.
+1. clone the repo
 1. install autogen and other dependencies
 1. make sure docker is installed and running
 1. python simple_universe.py
