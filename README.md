@@ -11,7 +11,11 @@ open the notebook, uncomment the pip install lines in the first notebook cell, r
 ### Current Development Highlights
 
 - [ ] **Innovative Maze Navigation**
-  - Building foundational AI to guide users through a labyrinth of narrative choices and interactive storytelling.
+  - [x] Maze generation
+  - [ ] Starting and Finish points
+  - [ ] Display maze
+  - [ ] Display maze with Fog of war
+  - [ ] Building foundational AI to guide users through a labyrinth of narrative choices and interactive storytelling.
 
 - [ ] **Advanced API for Seamless Integration**
   - Developing an API that connects AutoGen's powerful backend with Saturn.chat's frontend, facilitating deep and immersive story interactions.
