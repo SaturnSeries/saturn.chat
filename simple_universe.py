@@ -1,6 +1,6 @@
 import random
 from autogen import (
-    AssistantAgent, UserProxyAgent, GroupChat, GroupChatManager,
+    UserProxyAgent, GroupChat, GroupChatManager,
     config_list_from_json, Agent, ConversableAgent
 )
 from typing import Union, Literal
@@ -10,7 +10,7 @@ import random
 import logging
 
 # Set up basic configuration for logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.CRITICAL, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 class Cell:
@@ -36,10 +36,11 @@ class RPG:
         self.current_location = self.get_random_start()
 
     def intro_maze(self):
-        """Introduce the maze to the player."""
+        """Introduce the maze to the player and show available moves."""
         message = "Welcome to the maze! Try to find your way out."
-        message += "\n" + self.get_location_description()
+        message += "\n" + self.get_location_description()  # Includes available moves
         return message
+
 
     def get_random_start(self):
         """Get a random starting position within the maze."""
@@ -49,40 +50,58 @@ class RPG:
     def move_player(self, direction):
         """Move the player in the specified direction if possible."""
         x, y = self.current_location
-        current_cell = self.maze.maze_grid[x][y]
+        cell = self.maze.maze_grid[x][y]
+        logging.warning(f"Attempting to move {direction} from ({x}, {y}) with walls {cell.walls}")
 
-        # Attempt to move in the specified direction
-        if direction == "north" and y > 0 and not self.maze.maze_grid[x][y].walls['N']:
-            y -= 1
-        elif direction == "south" and y < self.maze.height - 1 and not self.maze.maze_grid[x][y + 1].walls['N']:
-            y += 1
-        elif direction == "east" and x < self.maze.width - 1 and not self.maze.maze_grid[x + 1][y].walls['W']:
-            x += 1
-        elif direction == "west" and x > 0 and not self.maze.maze_grid[x][y].walls['W']:
-            x -= 1
+        if direction == "N" and not cell.walls['N']:
+            if y > 0:  # Ensure not at the top boundary
+                y -= 1
+                moved = True
+        elif direction == "S" and not cell.walls['S']:
+            if y < self.maze.height - 1:  # Ensure not at the bottom boundary
+                y += 1
+                moved = True
+        elif direction == "E" and not cell.walls['E']:
+            if x < self.maze.width - 1:  # Ensure not at the right boundary
+                x += 1
+                moved = True
+        elif direction == "W" and not cell.walls['W']:
+            if x > 0:  # Ensure not at the left boundary
+                x -= 1
+                moved = True
+        else:
+            moved = False
+        
+        if moved:
+            self.current_location = (x, y)
+            return self.get_location_description()
         else:
             return "You can't move that way."
 
-        self.current_location = (x, y)
-        return self.get_location_description()
+
 
 
     def get_location_description(self):
         """Provide a description of the current location and possible paths."""
         x, y = self.current_location
         cell = self.maze.maze_grid[x][y]
-        directions = ["North" if not cell.walls['N'] else "",
-                      "South" if not cell.walls['S'] else "",
-                      "East" if not cell.walls['E'] else "",
-                      "West" if not cell.walls['W'] else ""]
-        directions = [direction for direction in directions if direction]  # Remove empty strings
+        directions = []
+        if not cell.walls['N'] and y > 0:
+            directions.append("North")
+        if not cell.walls['S'] and y < self.maze.height - 1:
+            directions.append("South")
+        if not cell.walls['E'] and x < self.maze.width - 1:
+            directions.append("East")
+        if not cell.walls['W'] and x > 0:
+            directions.append("West")
 
         description = f"You are now at location ({x}, {y})."
         if directions:
             description += " Paths available: " + ", ".join(directions) + "."
         else:
-            description += " No paths available."
+            description += " You are trapped with no paths available."
         return description
+
 
     def get_current_coordinates(self):
         """Return the coordinates of the player's current location."""
@@ -190,7 +209,7 @@ gpt4_config = {
     "timeout": 120
 }
 
-class MazeNavigator(AssistantAgent):
+class MazeNavigator(ConversableAgent):
     def __init__(self, name, llm_config, system_message, rpg_instance):
         super().__init__(name=name, llm_config=llm_config, system_message=system_message)
         self.rpg_instance = rpg_instance
@@ -233,6 +252,7 @@ class MazeApp:
             
     def register_tools(self):
         def move_player_wrapper(direction: str) -> str:
+            """Wrapper function for moving the player in the RPG maze. Move the player 1 block toward a specific direction, and returns the location of the new block"""
             return self.rpg.move_player(direction)
 
         def get_current_position_wrapper() -> str:
@@ -295,4 +315,4 @@ class MazeApp:
 
 # Example usage:
 maze_app = MazeApp()
-maze_app.initiate_chat("where am i")
+maze_app.initiate_chat("move N")
