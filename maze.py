@@ -1,5 +1,4 @@
 # maze.py
-
 import random
 
 class Cell:
@@ -14,8 +13,9 @@ class Maze:
         self.width = width
         self.height = height
         self.maze_grid = [[Cell(x, y) for y in range(height)] for x in range(width)]
+        self.start_location = (0, 0)  # Starting at the top-left corner
+        self.exit_location = (width - 1, height - 1)  # Exit at the bottom-right corner
         self.generate_maze()
-
 
     def generate_maze(self):
         stack = []
@@ -77,17 +77,6 @@ class Maze:
                 cell1.walls['E'] = False
                 cell2.walls['W'] = False
 
-    def get_maze(self):
-        return [[cell.walls for cell in row] for row in self.maze_grid]
-
-
-
-
-    def get_all_locations(self):
-        """Return a list of all cell coordinates in the maze."""
-        locations = [(x, y) for x in range(self.width) for y in range(self.height)]
-        return locations
-
-def create_maze(width, height):
-    maze = Maze(width, height)
-    return maze.get_maze()
+    def get_maze_and_locations(self):
+        """Returns the maze grid along with starting and exit locations."""
+        return self.maze_grid, self.start_location, self.exit_location
