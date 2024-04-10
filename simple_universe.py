@@ -1,5 +1,6 @@
 import logging
 import random
+from autogen import register_function
 from typing import Literal, Union
 
 from autogen import (Agent, ConversableAgent, GroupChat, GroupChatManager,
@@ -160,6 +161,7 @@ from typing import Tuple
 
 
 class MazeExplorer:
+    """Creates maze and places you in a start position"""
     def __init__(self, width: int, height: int):
         self.maze = Maze(width, height)
         self.current_location = self.get_random_start()
@@ -207,8 +209,7 @@ gpt4_config = {
     "timeout": 120,
 }
 
-
-class MazeNavigator(ConversableAgent):
+class SaturnBot(ConversableAgent):
     def __init__(self, name, llm_config, system_message, rpg_instance):
         super().__init__(
             name=name, llm_config=llm_config, system_message=system_message
@@ -226,33 +227,39 @@ class MazeNavigator(ConversableAgent):
             return self.rpg_instance.display_maze()
         else:
             return "Unknown tool invocation."
+        
+class Legend(ConversableAgent):
+    def __init__(self, name, llm_config, system_message):
+        super().__init__(
+          name=name, llm_config=llm_config, system_message=system_message
+        )
 
 
-from autogen import register_function
 
-
-class MazeApp:
+class SaturnChatApp:
     def __init__(self, work_dir="./maze"):
         self.rpg = RPG(10, 10)  # Instantiate the RPG game
-        self.navigator = MazeNavigator(
-            "Navigator", gpt4_config, "Navigating the maze.", self.rpg
-        )
-        self.explorer = UserProxyAgent(
-            "Explorer", "Exploring the maze.", {"work_dir": work_dir}
-        )
-        self.setup_group_chat()
 
-        self.navigator = MazeNavigator(
-            name="Navigator",
+        # Agent 1
+        self.saturnbot = SaturnBot(
+            name="Saturn Bot",
             llm_config=gpt4_config,
-            system_message="Navigating the maze.",
+            system_message="""You are Saturn Bot, you guide the player across a maze and they need to find the exit. 
+            You have the possibility to move around, display the map and tell stories about Saturn.
+            """,
             rpg_instance=self.rpg,  # Pass RPG instance
         )
+
+        # Agent 2
         self.explorer = UserProxyAgent(
             name="Explorer",
             system_message="Exploring the maze, executing commands for movement.",
             code_execution_config={"work_dir": work_dir},
         )
+        self.legend = Legend(name="Oberon", llm_config=gpt4_config,
+            system_message="""You are a legend with solar sign Sagittarius and lunar sign Lion.
+            You are in a maze trying to escape, you need to find a way out with the help of an explorer.
+            """,)
         self.register_tools()  # New method for registering tools
         self.setup_group_chat()
 
@@ -270,7 +277,7 @@ class MazeApp:
 
         register_function(
             move_player_wrapper,
-            caller=self.navigator,
+            caller=self.saturnbot,
             executor=self.explorer,
             name="move_player",
             description="Moves the player in the specified direction within the maze.",
@@ -278,7 +285,7 @@ class MazeApp:
 
         register_function(
             get_current_position_wrapper,
-            caller=self.navigator,
+            caller=self.saturnbot,
             executor=self.explorer,
             name="get_current_position",
             description="Returns the current position of the player.",
@@ -286,7 +293,7 @@ class MazeApp:
 
         register_function(
             display_maze_wrapper,
-            caller=self.navigator,
+            caller=self.saturnbot,
             executor=self.explorer,
             name="display_maze",
             description="Displays the current state of the maze.",
@@ -295,7 +302,7 @@ class MazeApp:
     def setup_group_chat(self):
         # Assuming GroupChat and GroupChatManager are configured to use the agents
         self.group_chat = GroupChat(
-            [self.navigator, self.explorer], [], self.custom_speaker_selection_func
+            [self.saturnbot, self.explorer, self.legend], [], self.custom_speaker_selection_func
         )
         self.group_chat_manager = GroupChatManager(self.group_chat, gpt4_config)
 
@@ -303,18 +310,18 @@ class MazeApp:
         self, last_speaker: Agent, groupchat: GroupChat
     ) -> Union[Agent, Literal["auto", "manual", "random", "round_robin"], None]:
         """Define a customized speaker selection function."""
-        if last_speaker == self.navigator:
+        if last_speaker == self.saturnbot:
             return self.explorer
         elif last_speaker == self.explorer:
-            return self.navigator
+            return self.legend
         return None
 
     def initiate_chat(self, message):
         # Send RPG intro message as the first conversation piece
-        self.navigator.send(self.rpg.intro_maze(), self.explorer)
-        self.explorer.initiate_chat(self.navigator, message=message)
+        self.saturnbot.send(self.rpg.intro_maze(), self.explorer)
+        self.explorer.initiate_chat(self.saturnbot, message=message)
 
 
 # Example usage:
-maze_app = MazeApp()
-maze_app.initiate_chat("move N")
+maze_app = SaturnChatApp()
+maze_app.initiate_chat("Hello! Who am I talking to right now?")
