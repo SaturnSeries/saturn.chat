@@ -98,7 +98,7 @@ class MazeNavigator(ConversableAgent):
         return "Unknown tool invocation."
 
 # Define the MazeApp class
-class MazeApp:
+class SaturnChatApp:
     def __init__(self, work_dir: str = "./maze"):
         self.rpg = RPG(10, 10)
         self.agents = [
@@ -166,5 +166,5 @@ class MazeApp:
 
 # Main entry point of the application
 if __name__ == "__main__":
-    maze_app = MazeApp()
+    maze_app = SaturnChatApp()
     maze_app.initiate_chat("move N")
