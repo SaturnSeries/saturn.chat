@@ -184,28 +184,6 @@ class Legend(ConversableAgent):
           name=name, llm_config=llm_config, system_message=system_message
         )
 
-        # #prepend the traits to 
-        # self.system_message = 
-
-    def get_metadata(self):
-        url = "https://api.opensea.io/api/v2/chain/ethereum/contract/0xD45b8768C9d5Cb57a130fa63fEab85Ba9f52Cc22/nfts/1"
-
-        headers = {
-            "accept": "application/json",
-            "x-api-key": config.opensea_api_key,
-        }
-
-        response = requests.get(url, headers=headers)
-
-        data = response.text
-        data = json.loads(data)
-
-        traits = data['nft']['traits']
-
-        # Prepare a text representation of the traits
-        trait_text = "\n".join([f"{trait['trait_type']}: {trait['value']}" for trait in traits])
-        
-        return trait_text
 
 class SaturnChatApp:
     def __init__(self, work_dir="./maze"):
@@ -228,16 +206,34 @@ class SaturnChatApp:
             code_execution_config={"work_dir": work_dir},
         )
 
-        # Agent 3: Legend Character
-        self.legend = Legend(name="Oberon", llm_config=gpt4_config,
-            system_message="""My name is Oberon, I'm are a legend with solar sign Sagittarius and lunar sign Lion.
-            I'm are in a maze trying to escape. Treasures await in this maze, if we're able to find them. I'll be talking with an explorer,
-            Lets explore and get out!
-            """,)
-        
+        # Agent 3-6: Legend Characters
+        self.legends = []  # List to store multiple Legend agents
+        for i in range(1,4):
+            traits = self.get_legend_metadata(i)
+            legend = Legend(
+                name=f"Legend_{i}",  # Give a unique name
+                llm_config=gpt4_config,
+                system_message=f"I am Legend_{i}. I'm in a maze trying to escape. Treasures await in this maze, if we're able to find them. I'll be talking with an explorer, let's explore and get out! \n\n These are my traits: \n\n {traits}"
+            )
+            self.legends.append(legend)  # Append to the list
+            
         self.register_tools() 
         self.setup_group_chat()
 
+    def get_legend_metadata(self, id: int):
+        url = f"https://api.opensea.io/api/v2/chain/ethereum/contract/0xD45b8768C9d5Cb57a130fa63fEab85Ba9f52Cc22/nfts/{id}"
+        headers = {
+            "accept": "application/json",
+            "x-api-key": config.opensea_api_key,
+        }
+        response = requests.get(url, headers=headers)
+        data = response.text
+        data = json.loads(data)
+        # print(data)
+        traits = data['nft']['traits']
+        trait_text = "\n".join([f"{trait['trait_type']}: {trait['value']}" for trait in traits])
+        return trait_text
+    
     def register_tools(self):
         def move_player_wrapper(direction: str) -> str:
             """Wrapper function for moving the player in the RPG maze. Move the player 1 block toward a specific direction, and returns the location of the new block"""
@@ -279,7 +275,7 @@ class SaturnChatApp:
     def setup_group_chat(self):
         # All agents are added to the group chat, ensuring they can send and receive messages
         self.group_chat = GroupChat(
-            [self.saturnbot, self.explorer, self.legend],  # Include all relevant agents here
+            [self.saturnbot, self.explorer] + self.legends,  # Include all relevant agents here
             [],                                            # Message history is empty to start
             speaker_selection_method='auto'            # Here we pass the custom speaker selection function
         )
@@ -299,10 +295,10 @@ class SaturnChatApp:
 
     def initiate_chat(self, message):
         # Send RPG intro messages as the first conversation piece
-        self.legend.send(
-                        "Hi, I'm Oberon, a Legend in the Saturn Series Universe. Ready to explore?",
-                        self.saturnbot,
-                        request_reply=False)
+        # self.legend.send(
+        #                 "Hi, I'm Oberon, a Legend in the Saturn Series Universe. Ready to explore?",
+        #                 self.saturnbot,
+        #                 request_reply=False)
         self.saturnbot.send(
                         self.rpg_maze.intro_maze(), 
                         self.explorer, 
@@ -316,4 +312,4 @@ class SaturnChatApp:
 # Run the chat application
 maze_app = SaturnChatApp()
 # maze_app.initiate_chat("Hello! Who am I talking to right now? Who is present in this conversation so far?")
-maze_app.initiate_chat("display")
+maze_app.initiate_chat("hello tell me more about you and your traits")
