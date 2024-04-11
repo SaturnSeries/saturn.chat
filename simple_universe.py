@@ -1,8 +1,10 @@
 import logging
 import random
 from autogen import register_function
-from typing import Literal, Union
+from typing import Literal, Union, Callable, get_type_hints, Tuple
 
+# Custom imports
+from maze import Maze
 from autogen import (Agent, ConversableAgent, GroupChat, GroupChatManager,
                      UserProxyAgent, config_list_from_json)
 
@@ -11,7 +13,6 @@ logging.basicConfig(
     level=logging.CRITICAL, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-
 class Cell:
     def __init__(self, x, y):
         self.x = x
@@ -19,129 +20,9 @@ class Cell:
         self.walls = {"N": True, "S": True, "E": True, "W": True}
         self.visited = False
 
-
-################
-# Maze Generation AND Movement LogiC
-################
-import random
-
-from maze import Maze
-
-# Assuming the Cell and Maze classes are defined above as you have provided.
-
-
-class RPG:
-    def __init__(self, width=10, height=10):
-        self.maze = Maze(width, height)
-        self.current_location = self.get_random_start()
-
-    def intro_maze(self):
-        """Introduce the maze to the player and show available moves."""
-        message = "Welcome to the maze! Try to find your way out."
-        message += "\n" + self.get_location_description()  # Includes available moves
-        return message
-
-    def get_random_start(self):
-        """Get a random starting position within the maze."""
-        possible_starts = [
-            (x, y) for x in range(self.maze.width) for y in range(self.maze.height)
-        ]
-        return random.choice(possible_starts)
-
-    def move_player(self, direction):
-        """Move the player in the specified direction if possible."""
-        x, y = self.current_location
-        cell = self.maze.maze_grid[x][y]
-        logging.warning(
-            f"Attempting to move {direction} from ({x}, {y}) with walls {cell.walls}"
-        )
-
-        if direction == "N" and not cell.walls["N"]:
-            if y > 0:  # Ensure not at the top boundary
-                y -= 1
-                moved = True
-        elif direction == "S" and not cell.walls["S"]:
-            if y < self.maze.height - 1:  # Ensure not at the bottom boundary
-                y += 1
-                moved = True
-        elif direction == "E" and not cell.walls["E"]:
-            if x < self.maze.width - 1:  # Ensure not at the right boundary
-                x += 1
-                moved = True
-        elif direction == "W" and not cell.walls["W"]:
-            if x > 0:  # Ensure not at the left boundary
-                x -= 1
-                moved = True
-        else:
-            moved = False
-
-        if moved:
-            self.current_location = (x, y)
-            return self.get_location_description()
-        else:
-            return "You can't move that way."
-
-    def get_location_description(self):
-        """Provide a description of the current location and possible paths."""
-        x, y = self.current_location
-        cell = self.maze.maze_grid[x][y]
-        directions = []
-        if not cell.walls["N"] and y > 0:
-            directions.append("North")
-        if not cell.walls["S"] and y < self.maze.height - 1:
-            directions.append("South")
-        if not cell.walls["E"] and x < self.maze.width - 1:
-            directions.append("East")
-        if not cell.walls["W"] and x > 0:
-            directions.append("West")
-
-        description = f"You are now at location ({x}, {y})."
-        if directions:
-            description += " Paths available: " + ", ".join(directions) + "."
-        else:
-            description += " You are trapped with no paths available."
-        return description
-
-    def get_current_coordinates(self):
-        """Return the coordinates of the player's current location."""
-        # This method had been defined twice in your initial submission. Consolidating to one.
-        return self.current_location
-
-    def get_current_location_info(self):
-        """Alias for get_location_description for clarity in conversational use."""
-        return self.get_location_description()
-
-    def display_maze(self):
-        maze_representation = ""
-        player_x, player_y = self.current_location  # Get player's current coordinates
-        for y in range(self.maze.height):
-            top_row = ""
-            middle_row = ""
-            for x in range(self.maze.width):
-                cell = self.maze.maze_grid[x][y]
-                top_row += "X" if cell.walls["N"] else " "
-                top_row += "X"
-
-                middle_row += "X" if cell.walls["W"] else " "
-                # Mark player's location with 'O'
-                if (x, y) == (player_x, player_y):
-                    middle_row += "O"
-                else:
-                    middle_row += " "
-            middle_row += "X"
-
-            maze_representation += top_row + "\n" + middle_row + "\n"
-
-        bottom_row = ""
-        for x in range(self.maze.width):
-            bottom_row += "XX"
-        maze_representation += bottom_row
-
-        return maze_representation
-
-
-from typing import Callable, get_type_hints
-
+######################################
+# Maze Generation and Movement Logic #
+######################################
 
 def annotate_self(func: Callable) -> Callable:
     """
@@ -157,20 +38,52 @@ def annotate_self(func: Callable) -> Callable:
     return func
 
 
-from typing import Tuple
-
-
 class MazeExplorer:
-    """Creates maze and places you in a start position"""
+    """
+    This class creates a maze and places you in a start position
+    to navigate through the maze. It provides methods to move in
+    different directions and get the current position of the player.
+    """
     def __init__(self, width: int, height: int):
-        self.maze = Maze(width, height)
+        self.maze = self.generate_maze(width, height)
         self.current_location = self.get_random_start()
+
+    def intro_maze(self):
+        """Introduce the maze to the player and show available moves."""
+        message = "Welcome to the maze! Try to find your way out."
+        message += "\n" + self.get_location_description()  # Includes available moves
+        return message
+    
+    def generate_maze(self, width: int, height: int) -> 'Maze':
+        return Maze(width, height)
 
     def get_random_start(self) -> Tuple[int, int]:
         possible_starts = [
             (x, y) for x in range(self.maze.width) for y in range(self.maze.height)
         ]
         return random.choice(possible_starts)
+
+
+    def get_location_description(self):
+        """Provide a description of the current location and possible paths."""
+        x, y = self.current_location
+        cell = self.maze.maze_grid[x][y]
+        directions = []
+        if not cell.walls["N"] and y > 0:
+            directions.append("North")
+        if not cell.walls["S"] and y < self.maze.height - 1:
+            directions.append("South")
+        if not cell.walls["E"] and x < self.maze.width - 1:
+            directions.append("East")
+        if not cell.walls["W"] and x > 0:
+            directions.append("West")
+            
+        description = f"You are now at location ({x}, {y})."
+        if directions:
+            description += " Paths available: " + ", ".join(directions) + "."
+        else:
+            description += " You are trapped with no paths available."
+        return description
 
     @annotate_self
     def move_player(self, direction):
@@ -201,6 +114,9 @@ class MazeExplorer:
     def get_current_position(self) -> str:
         return f"Current position: {self.current_location}."
 
+######################################
+# Custom ConversableAgent Subclasses #
+######################################
 
 gpt4_config = {
     "cache_seed": random.randint(0, 9999999999999999),
@@ -215,7 +131,7 @@ class SaturnBot(ConversableAgent):
             name=name, llm_config=llm_config, system_message=system_message
         )
         self.rpg_instance = rpg_instance
-        logging.warn("MazeNavigator initialized with RPG instance.")
+        logging.warning("MazeNavigator initialized with RPG instance.")
 
     def on_tool_invocation(self, tool_name, *args, **kwargs):
         if tool_name == "move_player":
@@ -227,18 +143,16 @@ class SaturnBot(ConversableAgent):
             return self.rpg_instance.display_maze()
         else:
             return "Unknown tool invocation."
-        
+
 class Legend(ConversableAgent):
     def __init__(self, name, llm_config, system_message):
         super().__init__(
           name=name, llm_config=llm_config, system_message=system_message
         )
 
-
-
 class SaturnChatApp:
     def __init__(self, work_dir="./maze"):
-        self.rpg = RPG(10, 10)  # Instantiate the RPG game
+        self.rpg = MazeExplorer(10, 10)  # Instantiate the RPG game
 
         # Agent 1
         self.saturnbot = SaturnBot(
@@ -250,17 +164,20 @@ class SaturnChatApp:
             rpg_instance=self.rpg,  # Pass RPG instance
         )
 
-        # Agent 2
+        # Agent 2, User proxy agent for the explorer
         self.explorer = UserProxyAgent(
             name="Explorer",
             system_message="Exploring the maze, executing commands for movement.",
             code_execution_config={"work_dir": work_dir},
         )
+
+        # Agent 3: Legend Character
         self.legend = Legend(name="Oberon", llm_config=gpt4_config,
             system_message="""My name is Oberon, I'm are a legend with solar sign Sagittarius and lunar sign Lion.
             I'm are in a maze trying to escape. Treasures await in this maze, if we're able to find them. I'll be talking with an explorer,
             Lets explore and get out!
             """,)
+        
         self.register_tools()  # New method for registering tools
         self.setup_group_chat()
 
@@ -301,28 +218,33 @@ class SaturnChatApp:
         )
 
     def setup_group_chat(self):
-        # Assuming GroupChat and GroupChatManager are configured to use the agents
+        # All agents are added to the group chat, ensuring they can send and receive messages
         self.group_chat = GroupChat(
-            [self.saturnbot, self.explorer, self.legend], [], self.custom_speaker_selection_func
+            [self.saturnbot, self.explorer, self.legend],  # Include all relevant agents here
+            [],                                            # Message history is empty to start
+            self.custom_speaker_selection_func             # Here we pass the custom speaker selection function
         )
         self.group_chat_manager = GroupChatManager(self.group_chat, gpt4_config)
 
     def custom_speaker_selection_func(
         self, last_speaker: Agent, groupchat: GroupChat
     ) -> Union[Agent, Literal["auto", "manual", "random", "round_robin"], None]:
-        """Define a customized speaker selection function."""
-        if last_speaker == self.saturnbot:
-            return self.explorer
-        elif last_speaker == self.explorer:
-            return self.legend
-        return None
+        # Custom logic to select who speaks next based on the last speaker and the conversation turn
+        if last_speaker == self.explorer:
+            return self.legend  # Oberon always responds first to the Explorer
+        elif last_speaker == self.legend:
+            return self.saturnbot  # Saturn Bot responds after Oberon
+        elif last_speaker == self.saturnbot:
+            return self.explorer  # Give the turn back to the Explorer after Saturn Bot
+        return None  # Fallback case
 
     def initiate_chat(self, message):
-        # Send RPG intro message as the first conversation piece
-        self.saturnbot.send(self.rpg.intro_maze(), self.explorer)
+        # Send RPG intro messages as the first conversation piece
+        self.legend.send("Hi, I'm Oberon, a Legend in the Saturn Series Universe. Ready to explore?", self.saturnbot, request_reply=False)
+        self.saturnbot.send(self.rpg.intro_maze(), self.explorer, request_reply=False)
         self.explorer.initiate_chat(self.saturnbot, message=message)
 
 
-# Example usage:
+# Run the chat application
 maze_app = SaturnChatApp()
-maze_app.initiate_chat("Hello! Who am I talking to right now?")
+maze_app.initiate_chat("Hello! Who am I talking to right now? Who is present in this conversation so far?")
