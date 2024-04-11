@@ -239,6 +239,7 @@ class Legend(ConversableAgent):
 class SaturnChatApp:
     def __init__(self, work_dir="./maze"):
         self.rpg = RPG(10, 10)  # Instantiate the RPG game
+        self.conversation_turn = 0  # Add a turn counter to manage the conversation flow
 
         # Agent 1
         self.saturnbot = SaturnBot(
@@ -300,28 +301,38 @@ class SaturnChatApp:
         )
 
     def setup_group_chat(self):
-        # Assuming GroupChat and GroupChatManager are configured to use the agents
+        # All agents are added to the group chat, ensuring they can send and receive messages
         self.group_chat = GroupChat(
-            [self.saturnbot, self.explorer, self.legend], [], self.custom_speaker_selection_func
+            [self.saturnbot, self.explorer, self.legend],  # Include all relevant agents
+            [],
+            self.custom_speaker_selection_func
         )
         self.group_chat_manager = GroupChatManager(self.group_chat, gpt4_config)
 
-    def custom_speaker_selection_func(
-        self, last_speaker: Agent, groupchat: GroupChat
-    ) -> Union[Agent, Literal["auto", "manual", "random", "round_robin"], None]:
-        """Define a customized speaker selection function."""
-        if last_speaker == self.saturnbot:
-            return self.explorer
-        elif last_speaker == self.explorer:
-            return self.legend
-        return None
+
+    def custom_speaker_selection_func(self, last_speaker: Agent, groupchat: GroupChat) -> Union[Agent, Literal["auto", "manual", "random", "round_robin"], None]:
+        # Custom logic to select who speaks next based on the last speaker and the conversation turn
+        if last_speaker == self.explorer:
+            return self.legend  # Oberon always responds first to the Explorer
+        elif last_speaker == self.legend:
+            return self.saturnbot  # Saturn Bot responds after Oberon
+        elif last_speaker == self.saturnbot:
+            return self.explorer  # Give the turn back to the Explorer after Saturn Bot
+        return None  # Fallback case
+
 
     def initiate_chat(self, message):
-        # Send RPG intro message as the first conversation piece
+        # Initialize the conversation with a message from Saturn Bot
         self.saturnbot.send(self.rpg.intro_maze(), self.explorer)
-        self.explorer.initiate_chat(self.saturnbot, message=message)
+        
+        # Oberon sends a message immediately after Saturn Bot
+        self.legend.send("Hi, I'm Oberon, a Legend in the Saturn Series Universe. Ready to explore?", self.saturnbot)
+
+        # Trigger the first user-initiated interaction
+        self.explorer.initiate_chat(self.legend, message=message)
+
 
 
 # Example usage:
 maze_app = SaturnChatApp()
-maze_app.initiate_chat("Hello! Who am I talking to right now?")
+maze_app.initiate_chat("Hello! Who am I talking to right now? Who is present in this conversation so far?")
