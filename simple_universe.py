@@ -257,8 +257,9 @@ class SaturnChatApp:
             code_execution_config={"work_dir": work_dir},
         )
         self.legend = Legend(name="Oberon", llm_config=gpt4_config,
-            system_message="""You are a legend with solar sign Sagittarius and lunar sign Lion.
-            You are in a maze trying to escape, you need to find a way out with the help of an explorer.
+            system_message="""My name is Oberon, I'm are a legend with solar sign Sagittarius and lunar sign Lion.
+            I'm are in a maze trying to escape. Treasures await in this maze, if we're able to find them. I'll be talking with an explorer,
+            Lets explore and get out!
             """,)
         self.register_tools()  # New method for registering tools
         self.setup_group_chat()
