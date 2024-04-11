@@ -4,9 +4,11 @@ from autogen import register_function
 from typing import Literal, Union, Callable, get_type_hints, Tuple
 
 # Custom imports
-from maze import Maze
 from autogen import (Agent, ConversableAgent, GroupChat, GroupChatManager,
                      UserProxyAgent, config_list_from_json)
+
+from maze import Maze
+
 
 # Set up basic configuration for logging
 logging.basicConfig(
@@ -77,7 +79,7 @@ class MazeExplorer:
             directions.append("East")
         if not cell.walls["W"] and x > 0:
             directions.append("West")
-            
+
         description = f"You are now at location ({x}, {y})."
         if directions:
             description += " Paths available: " + ", ".join(directions) + "."
@@ -231,7 +233,7 @@ class SaturnChatApp:
     ) -> Union[Agent, Literal["auto", "manual", "random", "round_robin"], None]:
         # Custom logic to select who speaks next based on the last speaker and the conversation turn
         if last_speaker == self.explorer:
-            return self.legend  # Oberon always responds first to the Explorer
+            return self.legend  # Oberon Legend always responds first to the Explorer
         elif last_speaker == self.legend:
             return self.saturnbot  # Saturn Bot responds after Oberon
         elif last_speaker == self.saturnbot:
@@ -240,9 +242,18 @@ class SaturnChatApp:
 
     def initiate_chat(self, message):
         # Send RPG intro messages as the first conversation piece
-        self.legend.send("Hi, I'm Oberon, a Legend in the Saturn Series Universe. Ready to explore?", self.saturnbot, request_reply=False)
-        self.saturnbot.send(self.rpg.intro_maze(), self.explorer, request_reply=False)
-        self.explorer.initiate_chat(self.saturnbot, message=message)
+        self.legend.send(
+                        "Hi, I'm Oberon, a Legend in the Saturn Series Universe. Ready to explore?",
+                        self.saturnbot,
+                        request_reply=False)
+        self.saturnbot.send(
+                        self.rpg.intro_maze(), 
+                        self.explorer, 
+                        request_reply=False)
+        
+        self.explorer.initiate_chat(
+                        self.legend, 
+                        message=message)
 
 
 # Run the chat application
