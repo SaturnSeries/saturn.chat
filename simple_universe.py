@@ -2,6 +2,9 @@ import logging
 import random
 from autogen import register_function
 from typing import Literal, Union, Callable, get_type_hints, Tuple
+import requests
+import json
+import config
 
 # Custom imports
 from autogen import (Agent, ConversableAgent, GroupChat, GroupChatManager,
@@ -115,6 +118,35 @@ class MazeExplorer:
     @annotate_self
     def get_current_position(self) -> str:
         return f"Current position: {self.current_location}."
+    
+    @annotate_self
+    def display_maze(self):
+        maze_representation = ""
+        player_x, player_y = self.current_location  # Get player's current coordinates
+        for y in range(self.maze.height):
+            top_row = ""
+            middle_row = ""
+            for x in range(self.maze.width):
+                cell = self.maze.maze_grid[x][y]
+                top_row += "X" if cell.walls["N"] else " "
+                top_row += "X"
+
+                middle_row += "X" if cell.walls["W"] else " "
+                # Mark player's location with 'O'
+                if (x, y) == (player_x, player_y):
+                    middle_row += "O"
+                else:
+                    middle_row += " "
+            middle_row += "X"
+
+            maze_representation += top_row + "\n" + middle_row + "\n"
+
+        bottom_row = ""
+        for x in range(self.maze.width):
+            bottom_row += "XX"
+        maze_representation += bottom_row
+
+        return maze_representation
 
 ######################################
 # Custom ConversableAgent Subclasses #
@@ -128,12 +160,12 @@ gpt4_config = {
 }
 
 class SaturnBot(ConversableAgent):
-    def __init__(self, name, llm_config, system_message, rpg_instance):
+    def __init__(self, name, llm_config, system_message, rpg_maze_instance: MazeExplorer):
         super().__init__(
             name=name, llm_config=llm_config, system_message=system_message
         )
-        self.rpg_instance = rpg_instance
-        logging.warning("MazeNavigator initialized with RPG instance.")
+        self.rpg_instance = rpg_maze_instance
+        logging.warning("SaturnBot initialized with RPG instance.")
 
     def on_tool_invocation(self, tool_name, *args, **kwargs):
         if tool_name == "move_player":
@@ -152,18 +184,41 @@ class Legend(ConversableAgent):
           name=name, llm_config=llm_config, system_message=system_message
         )
 
+        # #prepend the traits to 
+        # self.system_message = 
+
+    def get_metadata(self):
+        url = "https://api.opensea.io/api/v2/chain/ethereum/contract/0xD45b8768C9d5Cb57a130fa63fEab85Ba9f52Cc22/nfts/1"
+
+        headers = {
+            "accept": "application/json",
+            "x-api-key": config.opensea_api_key,
+        }
+
+        response = requests.get(url, headers=headers)
+
+        data = response.text
+        data = json.loads(data)
+
+        traits = data['nft']['traits']
+
+        # Prepare a text representation of the traits
+        trait_text = "\n".join([f"{trait['trait_type']}: {trait['value']}" for trait in traits])
+        
+        return trait_text
+
 class SaturnChatApp:
     def __init__(self, work_dir="./maze"):
-        self.rpg = MazeExplorer(10, 10)  # Instantiate the RPG game
+        self.rpg_maze = MazeExplorer(10, 10)  # Instantiate the RPG game
 
         # Agent 1
         self.saturnbot = SaturnBot(
-            name="Saturn Bot",
+            name="SaturnBot",
             llm_config=gpt4_config,
             system_message="""You are Saturn Bot, you guide the player across a maze and they need to find the exit. 
             You have the possibility to move around, display the map and tell stories about Saturn.
             """,
-            rpg_instance=self.rpg,  # Pass RPG instance
+            rpg_maze_instance=self.rpg_maze,  # Pass RPG instance
         )
 
         # Agent 2, User proxy agent for the explorer
@@ -180,20 +235,22 @@ class SaturnChatApp:
             Lets explore and get out!
             """,)
         
-        self.register_tools()  # New method for registering tools
+        self.register_tools() 
         self.setup_group_chat()
 
     def register_tools(self):
         def move_player_wrapper(direction: str) -> str:
             """Wrapper function for moving the player in the RPG maze. Move the player 1 block toward a specific direction, and returns the location of the new block"""
-            return self.rpg.move_player(direction)
-
+            return self.rpg_maze.move_player(direction)
+        
         def get_current_position_wrapper() -> str:
-            position = self.rpg.get_current_coordinates()
-            return f"Current position: {position}."
+            position = self.rpg_maze.get_current_position() 
+            return position
+
 
         def display_maze_wrapper() -> str:
-            return self.rpg.display_maze()
+            return self.rpg_maze.display_maze()
+
 
         register_function(
             move_player_wrapper,
@@ -224,20 +281,20 @@ class SaturnChatApp:
         self.group_chat = GroupChat(
             [self.saturnbot, self.explorer, self.legend],  # Include all relevant agents here
             [],                                            # Message history is empty to start
-            self.custom_speaker_selection_func             # Here we pass the custom speaker selection function
+            speaker_selection_method='auto'            # Here we pass the custom speaker selection function
         )
-        self.group_chat_manager = GroupChatManager(self.group_chat, gpt4_config)
+        self.group_chat_manager = GroupChatManager(groupchat=self.group_chat, llm_config=gpt4_config)
 
     def custom_speaker_selection_func(
         self, last_speaker: Agent, groupchat: GroupChat
     ) -> Union[Agent, Literal["auto", "manual", "random", "round_robin"], None]:
         # Custom logic to select who speaks next based on the last speaker and the conversation turn
         if last_speaker == self.explorer:
-            return self.legend  # Oberon Legend always responds first to the Explorer
+            return self.saturnbot
         elif last_speaker == self.legend:
-            return self.saturnbot  # Saturn Bot responds after Oberon
+            return self.explorer  
         elif last_speaker == self.saturnbot:
-            return self.explorer  # Give the turn back to the Explorer after Saturn Bot
+            return self.legend  
         return None  # Fallback case
 
     def initiate_chat(self, message):
@@ -247,15 +304,16 @@ class SaturnChatApp:
                         self.saturnbot,
                         request_reply=False)
         self.saturnbot.send(
-                        self.rpg.intro_maze(), 
+                        self.rpg_maze.intro_maze(), 
                         self.explorer, 
                         request_reply=False)
         
         self.explorer.initiate_chat(
-                        self.legend, 
+                        self.group_chat_manager, 
                         message=message)
 
 
 # Run the chat application
 maze_app = SaturnChatApp()
-maze_app.initiate_chat("Hello! Who am I talking to right now? Who is present in this conversation so far?")
+# maze_app.initiate_chat("Hello! Who am I talking to right now? Who is present in this conversation so far?")
+maze_app.initiate_chat("display")
