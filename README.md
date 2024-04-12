@@ -30,8 +30,10 @@ Saturn.chat integrates the AutoGen framework to advance the development of Large
   - Progressing with the development of a dynamic and responsive WebUI, ensuring a fluid user experience across the Saturn.chat platform.
 
 - [ ] **Dynamic Item Interactions**
-  - Introducing interactive items that users can discover and utilize, adding layers of depth to the narrative experience.
-
+  - [x] Introducing interactive items that users can inspect and utilize, adding layers of depth to the narrative experience.
+  - [x] Durability decreases when you use the items, and that use can execute custom logic.
+  - [ ] Populate the maze with AI generated conted, based on provided Lore.
+    
 - [ ] **Rich NPC Character Integration**
   - Creating NPCs with complex AI to offer quests, unfold lore, and present interactive challenges, further immersing users in the Saturn.chat universe.
 
