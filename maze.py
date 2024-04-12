@@ -1,4 +1,13 @@
 import random
+import logging
+
+from autogen import (Agent, ConversableAgent, GroupChat, GroupChatManager,
+                     UserProxyAgent, config_list_from_json)
+
+# Set up basic configuration for logging
+logging.basicConfig(
+    level=logging.CRITICAL, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 #####################
 # Custom Item Class #
@@ -43,8 +52,6 @@ class Item:
         durability_str = f", Durability: {'Infinite' if self.durability is None else self.durability}"
         return f"{self.name}: {self.description}{durability_str}"
 
-
-
 ##############################
 # Custom Maze Implementation #
 ##############################
@@ -57,20 +64,38 @@ class Cell:
         self.visited = False
         self.state = 4  # Default state is 4 for undiscovered
         self.item = None  # Initially no item
+        self.npc = None   # Initially no NPC
 
     def place_item(self, item):
         self.item = item
 
+        
+    def place_npc(self, npc):
+        self.npc = npc
+
 class Maze:
-    def __init__(self, width, height, items_prob=0.1):
+    def __init__(self, width, height, items_prob=0.7, npcs=None):
         self.width = width
         self.height = height
         self.maze_grid = [[Cell(x, y) for y in range(height)] for x in range(width)]
         self.start_point = (1, 1)
         self.finish_point = (width - 2, height - 2)
         self.generate_maze()
-        # self.populate_items(items_prob)
         self.place_starting_loot()
+        if npcs:
+            self.place_npcs(npcs)  # Correctly place NPCs after generating the maze
+
+    def place_npcs(self, npcs):
+        for npc in npcs:
+            # Ensuring the NPC is placed at the starting point and not as an item
+            self.maze_grid[self.start_point[0]][self.start_point[1]].place_npc(npc)
+            npc.send_initial_greeting()  # Ensure NPC sends greeting upon being placed
+
+    def place_npc(self, npc, x, y):
+        # Assigning NPC to the npc property of the cell
+        self.maze_grid[x][y].npc = npc
+        logging.critical(f"NPC {npc.name} placed at {x}, {y}")
+
 
     def generate_maze(self):
         stack = []
@@ -196,3 +221,4 @@ class Maze:
         maze_representation += bottom_row
 
         return maze_representation
+
