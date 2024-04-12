@@ -21,7 +21,6 @@ class Item:
         self.inspection_detail = inspection_detail  # Additional detail revealed upon inspection
         self.custom_functionality = custom_functionality  # Callback function to execute on use
 
-
     def inspect_item(self):
         """Return detailed information about this item."""
         if self.inspection_detail:
@@ -64,14 +63,14 @@ class Cell:
         self.visited = False
         self.state = 4  # Default state is 4 for undiscovered
         self.item = None  # Initially no item
-        self.npc = None   # Initially no NPC
+        self.npcs = []   # Initially no NPC
 
     def place_item(self, item):
         self.item = item
 
         
     def place_npc(self, npc):
-        self.npc = npc
+        self.npcs.append(npc)
 
 class Maze:
     def __init__(self, width, height, items_prob=0.7, npcs=None):
@@ -83,13 +82,15 @@ class Maze:
         self.generate_maze()
         self.place_starting_loot()
         if npcs:
-            self.place_npcs(npcs)  # Correctly place NPCs after generating the maze
+            self.place_npcs(npcs)  
+
 
     def place_npcs(self, npcs):
+        # Place NPCs at specific or random locations as needed
         for npc in npcs:
-            # Ensuring the NPC is placed at the starting point and not as an item
-            self.maze_grid[self.start_point[0]][self.start_point[1]].place_npc(npc)
-            npc.send_initial_greeting()  # Ensure NPC sends greeting upon being placed
+            x, y = (1, 1)  # Example fixed position, change as needed
+            self.maze_grid[x][y].place_npc(npc)
+            npc.send_initial_greeting()
 
     def place_npc(self, npc, x, y):
         # Assigning NPC to the npc property of the cell
@@ -221,4 +222,3 @@ class Maze:
         maze_representation += bottom_row
 
         return maze_representation
-
