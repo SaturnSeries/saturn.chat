@@ -15,8 +15,9 @@ Saturn.chat integrates the AutoGen framework to advance the development of Large
 
 - [ ] **Innovative Maze Navigation**
   - [x] Maze generation
-  - [ ] Starting and Finish points
-  - [ ] Display maze
+  - [x] Starting point
+  - [ ] Finish point
+  - [x] Display maze
   - [ ] Display maze with Fog of war
   - [ ] Building foundational AI to guide users through a labyrinth of narrative choices and interactive storytelling.
 
@@ -35,7 +36,8 @@ Saturn.chat integrates the AutoGen framework to advance the development of Large
   - [ ] Populate the maze with AI generated conted, based on provided Lore.
     
 - [ ] **Rich NPC Character Integration**
-  - Creating NPCs with complex AI to offer quests, unfold lore, and present interactive challenges, further immersing users in the Saturn.chat universe.
+  - [x] Creating simple Autogen Agents NPCs
+  - [ ] Create NPCs with complex AI to offer quests, unfold lore, and present interactive challenges, further immersing users in the Saturn.chat universe.
 
 - [ ] **Legend Companion Development**
   - [x] **Conversational Interactions**: Enabling users to engage in meaningful conversations with their Legend NFT companions.
