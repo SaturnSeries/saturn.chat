@@ -96,7 +96,6 @@ class MazeExplorer:
         return cell.npcs
 
 
-
     @annotate_self
     def move_player(self, direction: str):
         """Move the player in the specified direction if possible, handling synonyms like 'up' for 'north', etc."""
@@ -118,15 +117,28 @@ class MazeExplorer:
 
             if 0 <= nx < self.maze.width and 0 <= ny < self.maze.height:
                 next_cell = self.maze.maze_grid[nx][ny]
-                wall_key = {'n': 'N', 's': 'S', 'e': 'E', 'w': 'W',
-                            'u': 'N', 'd': 'S', 'r': 'E', 'l': 'W'}.get(direction[0])
-                if wall_key and not next_cell.walls[wall_key]:
+                if self.can_move(current_cell, next_cell, direction[0]):
                     self.current_location = (nx, ny)
                     return self.get_location_description()
-            return "You can't move that way."
+                else:
+                    return "You can't move that way."
+            else:
+                return "You can't move beyond the maze boundaries."
         else:
             return "Invalid direction. Use 'north', 'south', 'east', 'west', or their abbreviations and synonyms like 'up' for north."
 
+    def can_move(self, current_cell, next_cell, direction):
+        """Check if the player can move from the current cell to the next cell in the specified direction."""
+        if direction == 'n':  # Moving North
+            return not current_cell.walls['N'] and not next_cell.walls['S']
+        elif direction == 's':  # Moving South
+            return not current_cell.walls['S'] and not next_cell.walls['N']
+        elif direction == 'e':  # Moving East
+            return not current_cell.walls['E'] and not next_cell.walls['W']
+        elif direction == 'w':  # Moving West
+            return not current_cell.walls['W'] and not next_cell.walls['E']
+        else:
+            return False  # Invalid direction
     @annotate_self
     def display_maze(self):
         """Utilize the Maze display function or define here if needed."""
@@ -428,4 +440,4 @@ class SaturnChatApp:
 
 maze_app = SaturnChatApp()
 # maze_app.initiate_chat("Hello! Who am I talking to right now? Who is present in this conversation so far?")
-maze_app.initiate_chat("what's around me??")
+maze_app.initiate_chat("display the maze??")
