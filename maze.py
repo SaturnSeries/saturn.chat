@@ -192,33 +192,53 @@ class Maze:
         locations = [(x, y) for x in range(self.width) for y in range(self.height)]
         return locations
 
+    
+
     def display_maze(self, player_location):
+        # Initialize an empty string to store the maze representation
         maze_representation = ""
+
+        # Iterate over each row in the maze
         for y in range(self.height):
-            # Top row of cells (North walls)
+            # Initialize strings to represent the top and middle rows of each cell
             top_row = ""
             middle_row = ""
+
+            # Iterate over each column in the maze
             for x in range(self.width):
+                # Access the cell at position (x, y) in the maze grid
                 cell = self.maze_grid[x][y]
-                top_row += "X" if cell.walls["N"] else " "
-                top_row += "X"
 
-                # Left side of the cell (West wall)
-                middle_row += "X" if cell.walls["W"] else " "
-                # Cell itself
+                # Represent horizontal walls at the top of each cell
+                top_row += "+--" if cell.walls["N"] else "+  "
+
+                # Represent vertical walls on the left side of each cell
+                middle_row += "| " if cell.walls["W"] else "  "
+
+                # Check if the current cell is the player's location
                 if (x, y) == player_location:
-                    middle_row += "O"  # Mark player location with 'O'
+                    # If yes, mark the player's location with 'O'
+                    middle_row += "O"
                 else:
-                    middle_row += " "  # Empty space if no player
-            # Closing wall on the right side
-            middle_row += "X"
+                    # If no player is in this cell, mark paths with ' ' and walls with 'X'
+                    middle_row += " " if cell.walls["W"] else " "
 
-            maze_representation += top_row + "\n" + middle_row + "\n"
+            # Close the cell with a vertical wall on the right side
+            middle_row += "|"
 
-        # Bottom row of the maze (South walls)
-        bottom_row = ""
+            # Append the top and middle rows of the current cell to the maze representation
+            maze_representation += top_row + "+\n" + middle_row + "\n"
+
+        # Initialize a string to represent the bottom row of the maze
+        bottom_row = "+"
+
+        # Add horizontal walls to the bottom row to close the maze
         for x in range(self.width):
-            bottom_row += "XX"  # Each cell's South wall and the maze's bottom boundary
+            bottom_row += "--+"
+
+        # Append the bottom row to the maze representation
         maze_representation += bottom_row
 
-        return maze_representation
+        # Print the maze representation
+        print(maze_representation)
+
