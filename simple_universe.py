@@ -29,8 +29,6 @@ def annotate_self(func: Callable) -> Callable:
     with its own class type. This is a workaround for frameworks that require
     all parameters, including `self`, to be annotated.
     """
-    # Assuming the first parameter of a method is always named 'self',
-    # and its type should be the class itself.
     # This uses get_type_hints to infer the type of 'self' dynamically.
     if "self" in func.__code__.co_varnames:
         func.__annotations__["self"] = get_type_hints(func).get("return", object)
@@ -51,7 +49,6 @@ class MazeExplorer:
         return self.get_location_description()
     
     def get_random_start(self):
-        # Use the Maze class method if available or define it here if not
         return random.choice(self.maze.get_all_locations())
 
     def get_location_description(self):
