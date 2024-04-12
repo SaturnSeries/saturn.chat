@@ -38,9 +38,9 @@ def annotate_self(func: Callable) -> Callable:
 
 
 class MazeExplorer:
-    def __init__(self, width: int, height: int):
+    def __init__(self, width: int, height: int, npcs: list = []):
         # Directly use the Maze class for creating the maze
-        self.maze = Maze(width, height)
+        self.maze = Maze(width, height, npcs=npcs)
         self.current_location = self.maze.start_point  # instead of self.get_random_start()
 
     def intro_maze(self):
@@ -55,31 +55,39 @@ class MazeExplorer:
     #     return random.choice(self.maze.get_all_locations())
 
     def get_location_description(self):
-        """Provide a description of the current location, possible paths, and any items present."""
+        """Provide a description of the current location, possible paths, and any items or NPCs present."""
         x, y = self.current_location
         cell = self.maze.maze_grid[x][y]
         directions = []
-        item_description = ""
+        descriptions = []
 
         # Check for available directions
-        if not cell.walls["N"] and y > 0: directions.append("North")
-        if not cell.walls["S"] and y < self.maze.height - 1: directions.append("South")
-        if not cell.walls["E"] and x < self.maze.width - 1: directions.append("East")
-        if not cell.walls["W"] and x > 0: directions.append("West")
-
+        if not cell.walls["N"] and y > 0:
+            directions.append("North")
+        if not cell.walls["S"] and y < self.maze.height - 1:
+            directions.append("South")
+        if not cell.walls["E"] and x < self.maze.width - 1:
+            directions.append("East")
+        if not cell.walls["W"] and x > 0:
+            directions.append("West")
         paths = "Paths available: " + ", ".join(directions) if directions else "You are trapped with no paths available."
 
         # Check for an item in the current cell and create a description if present
         if cell.item:
-            item_description = f"You see an item here: {cell.item.name} - {cell.item.description}"
+            descriptions.append(f"You see an item here: {cell.item.name} - {cell.item.description}")
         else:
-            item_description = "There is nothing of interest here, lets go somewhere else."
-        # Combine descriptions of paths and items
-        location_description = f"You are now at location ({x}, {y}). {paths}"
-        if item_description:
-            location_description += "\n" + item_description
+            descriptions.append("There is nothing of interest here.")
 
+        # Check if there is an NPC in this cell
+        if cell.npc:
+            descriptions.append(f"You encounter a character: {cell.npc.name}. {cell.npc.system_message}")
+
+        # Combine descriptions of paths, items, and NPCs
+        location_description = f"You are now at location ({x}, {y}). {paths}"
+        location_description += "\n" + "\n".join(descriptions)
+        
         return location_description
+
 
 
     @annotate_self
@@ -149,7 +157,10 @@ gpt4_config = {
 class SaturnBot(ConversableAgent):
     def __init__(self, name, llm_config, system_message, rpg_maze_instance: MazeExplorer):
         super().__init__(
-            name=name, llm_config=llm_config, system_message=system_message
+            name=name,
+            llm_config=llm_config,
+            system_message=system_message,
+            human_input_mode="NEVER"
         )
         self.rpg_instance = rpg_maze_instance
         logging.warning("SaturnBot initialized with RPG instance.")
@@ -170,15 +181,74 @@ class SaturnBot(ConversableAgent):
 class Legend(ConversableAgent):
     def __init__(self, name, llm_config, system_message):
         super().__init__(
-          name=name, llm_config=llm_config, system_message=system_message
+            name=name,
+            llm_config=llm_config,
+            system_message=system_message,
+            human_input_mode="NEVER"
+        )
+
+class NPC(ConversableAgent):
+    def __init__(self, name, llm_config, system_message, backstory, dialogues, explorer):
+        super().__init__(
+            name=name,
+            llm_config=llm_config,
+            system_message=system_message,
+            human_input_mode="NEVER"
+        )
+        self.backstory = backstory
+        self.dialogues = dialogues
+        self.dialogue_index = 0
+        self.explorer = explorer  # Add explorer as an attribute
+
+    def send_initial_greeting(self):
+        # Send initial greeting to the explorer
+        self.send(self.backstory, self.explorer)
+
+    def advance_dialogue(self):
+        if self.dialogue_index < len(self.dialogues):
+            self.send(self.dialogues[self.dialogue_index], self.explorer)
+            self.dialogue_index += 1
+        else:
+            self.send("I have told you all I know.", self.explorer)
+
+
+
+####################################
+# Group Chat and Application Logic #
+####################################
+
+# In your application initialization
+class SaturnChatApp:
+    def __init__(self, work_dir="./maze"):
+        # Instantiate explorer first
+        self.explorer = UserProxyAgent(
+            name="Explorer",
+            system_message="Exploring the maze, executing commands for movement.",
+            code_execution_config={"work_dir": work_dir},
         )
 
 
-class SaturnChatApp:
-    def __init__(self, work_dir="./maze"):
-        self.rpg_maze = MazeExplorer(10, 10)  # Instantiate the RPG game
 
-        # Agent 1
+        # Agent 2, User proxy agent for the explorer
+        self.explorer = UserProxyAgent(
+            name="Explorer",
+            system_message="Exploring the maze, executing commands for movement.",
+            code_execution_config={"work_dir": work_dir},
+        )
+        # Agent 1: Guardian
+        # Create the NPC with explorer passed as an argument
+        self.guardian_npc = NPC(
+            name="Guardian",
+            llm_config=gpt4_config,
+            system_message="I'm a spectral figure that from the shadows.",
+            backstory="Guardian of the ancient labyrinth, keeper of its secrets.",
+            dialogues=["Welcome, traveler, to the labyrinth of doom.", "Beware the paths that twist and turn.", "Seek the treasure but watch for traps."],
+            explorer=self.explorer
+        )
+        # Pass the NPC list to MazeExplorer
+        self.rpg_maze = MazeExplorer(10, 10, npcs=[self.guardian_npc])
+
+        # Agent 2
         self.saturnbot = SaturnBot(
             name="SaturnBot",
             llm_config=gpt4_config,
@@ -187,15 +257,10 @@ class SaturnChatApp:
             You do not make up any stories, you only provide information about the maze based on the context of the conversation.
             DO NOT MAKE STUFF UP!
             """,
-            rpg_maze_instance=self.rpg_maze,  # Pass RPG instance
+            rpg_maze_instance=self.rpg_maze,  # Pass RPG Maze instance
         )
 
-        # Agent 2, User proxy agent for the explorer
-        self.explorer = UserProxyAgent(
-            name="Explorer",
-            system_message="Exploring the maze, executing commands for movement.",
-            code_execution_config={"work_dir": work_dir},
-        )
+
 
         # Agent 3-9: Legend Characters
         self.legends = []  # List to store multiple Legend agents
@@ -332,8 +397,10 @@ class SaturnChatApp:
                         self.group_chat_manager, 
                         message=message)
 
+############################
+# Run the chat application #
+############################
 
-# Run the chat application
 maze_app = SaturnChatApp()
 # maze_app.initiate_chat("Hello! Who am I talking to right now? Who is present in this conversation so far?")
 maze_app.initiate_chat("what's around me??")
