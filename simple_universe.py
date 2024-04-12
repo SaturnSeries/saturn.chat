@@ -10,7 +10,7 @@ import config
 from autogen import (Agent, ConversableAgent, GroupChat, GroupChatManager,
                      UserProxyAgent, config_list_from_json)
 
-from maze import Maze
+from maze import Maze, Item, Cell
 
 
 # Set up basic configuration for logging
@@ -29,6 +29,8 @@ def annotate_self(func: Callable) -> Callable:
     with its own class type. This is a workaround for frameworks that require
     all parameters, including `self`, to be annotated.
     """
+    # Assuming the first parameter of a method is always named 'self',
+    # and its type should be the class itself.
     # This uses get_type_hints to infer the type of 'self' dynamically.
     if "self" in func.__code__.co_varnames:
         func.__annotations__["self"] = get_type_hints(func).get("return", object)
@@ -39,7 +41,7 @@ class MazeExplorer:
     def __init__(self, width: int, height: int):
         # Directly use the Maze class for creating the maze
         self.maze = Maze(width, height)
-        self.current_location = self.get_random_start()
+        self.current_location = self.maze.start_point  # instead of self.get_random_start()
 
     def intro_maze(self):
         """Introduce the maze to the player and show available moves."""
@@ -48,22 +50,37 @@ class MazeExplorer:
     def get_current_position(self):
         return self.get_location_description()
     
-    def get_random_start(self):
-        return random.choice(self.maze.get_all_locations())
+    # def get_random_start(self):
+    #     # Use the Maze class method if available or define it here if not
+    #     return random.choice(self.maze.get_all_locations())
 
     def get_location_description(self):
-        """Provide a description of the current location and possible paths."""
+        """Provide a description of the current location, possible paths, and any items present."""
         x, y = self.current_location
         cell = self.maze.maze_grid[x][y]
         directions = []
-        # Use Maze class methods to check for walls
+        item_description = ""
+
+        # Check for available directions
         if not cell.walls["N"] and y > 0: directions.append("North")
         if not cell.walls["S"] and y < self.maze.height - 1: directions.append("South")
         if not cell.walls["E"] and x < self.maze.width - 1: directions.append("East")
         if not cell.walls["W"] and x > 0: directions.append("West")
 
         paths = "Paths available: " + ", ".join(directions) if directions else "You are trapped with no paths available."
-        return f"You are now at location ({x}, {y}). {paths}"
+
+        # Check for an item in the current cell and create a description if present
+        if cell.item:
+            item_description = f"You see an item here: {cell.item.name} - {cell.item.description}"
+        else:
+            item_description = "There is nothing of interest here, lets go somewhere else."
+        # Combine descriptions of paths and items
+        location_description = f"You are now at location ({x}, {y}). {paths}"
+        if item_description:
+            location_description += "\n" + item_description
+
+        return location_description
+
 
     @annotate_self
     def move_player(self, direction: str):
@@ -99,6 +116,24 @@ class MazeExplorer:
     def display_maze(self):
         """Utilize the Maze display function or define here if needed."""
         return self.maze.display_maze(self.current_location)
+    
+    @annotate_self
+    def inspect_item(self):
+        x, y = self.current_location
+        cell: Cell = self.maze.maze_grid[x][y]
+        if cell.item:
+            return cell.item.inspect_item()
+        else:
+            return "There is no item here to inspect."
+        
+    @annotate_self
+    def use_item(self):
+        x, y = self.current_location
+        cell: Cell = self.maze.maze_grid[x][y]
+        if cell.item:
+            return cell.item.use_item()
+        else:
+            return "There is no item here to use."
 
 ######################################
 # Custom ConversableAgent Subclasses #
@@ -127,6 +162,8 @@ class SaturnBot(ConversableAgent):
             return self.rpg_instance.get_current_location_info()
         elif tool_name == "display_maze":
             return self.rpg_instance.display_maze()
+        elif tool_name == "get_location_description":
+            return self.rpg_instance.get_location_description()
         else:
             return "Unknown tool invocation."
 
@@ -147,6 +184,8 @@ class SaturnChatApp:
             llm_config=gpt4_config,
             system_message="""You are Saturn Bot, you guide the player across a maze and they need to find the exit. 
             You have the possibility to move around, display the map and tell stories about Saturn.
+            You do not make up any stories, you only provide information about the maze based on the context of the conversation.
+            DO NOT MAKE STUFF UP!
             """,
             rpg_maze_instance=self.rpg_maze,  # Pass RPG instance
         )
@@ -195,11 +234,19 @@ class SaturnChatApp:
             position = self.rpg_maze.get_current_position() 
             return position
 
-
         def display_maze_wrapper() -> str:
             return self.rpg_maze.display_maze()
 
 
+        def get_location_description_wrapper() -> str:
+            return self.rpg_maze.get_location_description()
+        
+        def inspect_item_wrapper() -> str:
+            return self.rpg_maze.inspect_item()
+
+        def use_item_wrapper() -> str:
+            return self.rpg_maze.use_item()
+        
         register_function(
             move_player_wrapper,
             caller=self.saturnbot,
@@ -213,7 +260,7 @@ class SaturnChatApp:
             caller=self.saturnbot,
             executor=self.explorer,
             name="get_current_position",
-            description="Returns the current position of the player.",
+            description="Returns the current position of the player. use this when they ask for their coordinates",
         )
 
         register_function(
@@ -224,6 +271,30 @@ class SaturnChatApp:
             description="Displays the current state of the maze.",
         )
 
+        register_function(
+            get_location_description_wrapper,
+            caller=self.saturnbot,
+            executor=self.explorer,
+            name="get_location_description",
+            description="Returns the description of the current location in the maze. use this when the user is confused about their current location and whats around them.",
+        )
+
+        register_function(
+            inspect_item_wrapper,
+            caller=self.saturnbot,
+            executor=self.explorer,
+            name="inspect_item",
+            description="Returns detailed information about the item in the current location.",
+        )
+
+        register_function(
+            use_item_wrapper,
+            caller=self.saturnbot,
+            executor=self.explorer,
+            name="use_item",
+            description="Uses the item in the current location.",
+        )
+        
     def setup_group_chat(self):
         # All agents are added to the group chat, ensuring they can send and receive messages
         self.group_chat = GroupChat(
@@ -265,4 +336,4 @@ class SaturnChatApp:
 # Run the chat application
 maze_app = SaturnChatApp()
 # maze_app.initiate_chat("Hello! Who am I talking to right now? Who is present in this conversation so far?")
-maze_app.initiate_chat("where am i?")
+maze_app.initiate_chat("what's around me??")
