@@ -1,40 +1,121 @@
-# maze.py
 import random
+
+#####################
+# Custom Item Class #
+#####################
+
+class Item:
+    def __init__(self, name, description, inspection_detail=None, durability=None, custom_functionality=None):
+        self.name = name
+        self.description = description
+        self.durability = durability  # None for items without durability, implies infinite use
+        self.inspection_detail = inspection_detail  # Additional detail revealed upon inspection
+        self.custom_functionality = custom_functionality  # Callback function to execute on use
+
+
+    def inspect_item(self):
+        """Return detailed information about this item."""
+        if self.inspection_detail:
+            return f"{self.name} - {self.description}. Further Details: {self.inspection_detail}"
+        return f"{self.name} - {self.description}. No additional details available."
+
+    def use_item(self):
+        """Use the item, reducing durability if applicable and executing a callback if present."""
+        if self.durability is not None:
+            if self.durability == 0:
+                return f"The {self.name} is already worn out and cannot be used."
+            self.durability -= 1
+            use_message = f"You use the {self.name}."
+            if self.durability > 0:
+                use_message += f" It can be used {self.durability} more times."
+            else:
+                use_message += " It has worn out and can no longer be used."
+        else:
+            use_message = f"You use the {self.name}, but it seems to last forever."
+
+        if self.custom_functionality:
+            functionality_result = self.custom_functionality()
+            use_message += " " + functionality_result
+
+        return use_message
+
+    def __str__(self):
+        durability_str = f", Durability: {'Infinite' if self.durability is None else self.durability}"
+        return f"{self.name}: {self.description}{durability_str}"
+
+
+
+##############################
+# Custom Maze Implementation #
+##############################
 
 class Cell:
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.walls = {'N': True, 'S': True, 'E': True, 'W': True}
+        self.walls = {"N": True, "S": True, "E": True, "W": True}
         self.visited = False
+        self.state = 4  # Default state is 4 for undiscovered
+        self.item = None  # Initially no item
+
+    def place_item(self, item):
+        self.item = item
 
 class Maze:
-    def __init__(self, width, height):
+    def __init__(self, width, height, items_prob=0.1):
         self.width = width
         self.height = height
         self.maze_grid = [[Cell(x, y) for y in range(height)] for x in range(width)]
-        self.start_location = (0, 0)  # Starting at the top-left corner
-        self.exit_location = (width - 1, height - 1)  # Exit at the bottom-right corner
+        self.start_point = (1, 1)
+        self.finish_point = (width - 2, height - 2)
         self.generate_maze()
+        # self.populate_items(items_prob)
+        self.place_starting_loot()
 
     def generate_maze(self):
         stack = []
-        start_cell = self.maze_grid[0][0]
+        start_cell = self.maze_grid[self.start_point[0]][self.start_point[1]]
         start_cell.visited = True
+        start_cell.state = 0  # Mark the start cell as part of the path
         stack.append(start_cell)
 
-        while len(stack) > 0:
+        while stack:
             current_cell = stack[-1]
             unvisited_neighbours = self.get_unvisited_neighbours(current_cell)
 
-            if len(unvisited_neighbours) == 0:
+            if not unvisited_neighbours:
                 stack.pop()
             else:
                 neighbour_cell = random.choice(unvisited_neighbours)
                 self.remove_wall(current_cell, neighbour_cell)
 
                 neighbour_cell.visited = True
+                neighbour_cell.state = 0  # Mark as part of the path
                 stack.append(neighbour_cell)
+
+
+    # def populate_items(self, prob):
+    #     # Populating items with a certain probability in each cell
+    #     items = [
+    #         Item("Key", "A small rusty key, wonder what it opens."),
+    #         Item("Coin", "A shiny gold coin, valuable."),
+    #         Item("Sword", "An old sword, still sharp. Might come in handy."),
+    #         Item("Potion", "A mysterious potion. Drink at your own risk!")
+    #     ]
+    #     for row in self.maze_grid:
+    #         for cell in row:
+    #             if random.random() < prob:
+    #                 cell.place_item(random.choice(items))
+
+    def place_starting_loot(self):
+        """Place a specific item at the starting point of the maze."""
+        starting_item = Item("Map", "An old map showing hints of hidden doors.",
+                             "The path to the exit is marked with a red line. When you inspect the map, it read 'The key to the exit is in the room with the sword.",
+                             durability=5,
+                             # The custom functionality removes a random wall when used
+                             custom_functionality=lambda: "A hidden door opens somewhere in the maze.")
+        self.maze_grid[self.start_point[0]][self.start_point[1]].item = starting_item
+
 
     def get_unvisited_neighbours(self, cell):
         neighbours = []
@@ -64,19 +145,54 @@ class Maze:
     def remove_wall(self, cell1, cell2):
         if cell1.x == cell2.x:
             if cell1.y > cell2.y:
-                cell1.walls['N'] = False
-                cell2.walls['S'] = False
+                cell1.walls["N"] = False
+                cell2.walls["S"] = False
             else:
-                cell1.walls['S'] = False
-                cell2.walls['N'] = False
+                cell1.walls["S"] = False
+                cell2.walls["N"] = False
         else:
             if cell1.x > cell2.x:
-                cell1.walls['W'] = False
-                cell2.walls['E'] = False
+                cell1.walls["W"] = False
+                cell2.walls["E"] = False
             else:
-                cell1.walls['E'] = False
-                cell2.walls['W'] = False
+                cell1.walls["E"] = False
+                cell2.walls["W"] = False
 
-    def get_maze_and_locations(self):
-        """Returns the maze grid along with starting and exit locations."""
-        return self.maze_grid, self.start_location, self.exit_location
+    def get_maze(self):
+        return [[cell.walls for cell in row] for row in self.maze_grid]
+
+    def get_all_locations(self):
+        """Return a list of all cell coordinates in the maze."""
+        locations = [(x, y) for x in range(self.width) for y in range(self.height)]
+        return locations
+
+    def display_maze(self, player_location):
+        maze_representation = ""
+        for y in range(self.height):
+            # Top row of cells (North walls)
+            top_row = ""
+            middle_row = ""
+            for x in range(self.width):
+                cell = self.maze_grid[x][y]
+                top_row += "X" if cell.walls["N"] else " "
+                top_row += "X"
+
+                # Left side of the cell (West wall)
+                middle_row += "X" if cell.walls["W"] else " "
+                # Cell itself
+                if (x, y) == player_location:
+                    middle_row += "O"  # Mark player location with 'O'
+                else:
+                    middle_row += " "  # Empty space if no player
+            # Closing wall on the right side
+            middle_row += "X"
+
+            maze_representation += top_row + "\n" + middle_row + "\n"
+
+        # Bottom row of the maze (South walls)
+        bottom_row = ""
+        for x in range(self.width):
+            bottom_row += "XX"  # Each cell's South wall and the maze's bottom boundary
+        maze_representation += bottom_row
+
+        return maze_representation
