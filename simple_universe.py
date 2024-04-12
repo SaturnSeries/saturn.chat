@@ -293,8 +293,30 @@ class SaturnChatApp:
             self.legends.append(legend)  # Append to the list
             
         self.register_tools() 
-        self.setup_group_chat()
+        self.group_chat = GroupChat([self.explorer, self.saturnbot], [], max_round=1000, speaker_selection_method="auto")
+        self.initial_group_chat = GroupChat([self.explorer] + [self.saturnbot] + [self.guardian_npc], [], max_round=1000, speaker_selection_method="auto")
+        self.group_chat_manager = GroupChatManager(groupchat=self.initial_group_chat)
 
+        self.update_group_chat_participants()  # Initialize group chat participants based on initial NPC locations
+
+
+
+    def update_group_chat_participants(self):
+        """Update the group chat participants based on current location NPCs."""
+        current_npcs = self.rpg_maze.get_npcs_at_location()
+        current_participants = [self.saturnbot, self.explorer] + current_npcs
+
+        # Update the GroupChat instance that the GroupChatManager is managing
+        self.group_chat_manager.groupchat.participants = current_participants
+
+
+
+    def move_player_and_update_chat(self, direction):
+        """Move player and update chat based on new location."""
+        move_result = self.rpg_maze.move_player(direction)
+        self.update_group_chat_participants()  # Update participants after moving
+        return move_result
+    
     def get_legend_metadata(self, id: int):
         url = f"https://api.opensea.io/api/v2/chain/ethereum/contract/0xD45b8768C9d5Cb57a130fa63fEab85Ba9f52Cc22/nfts/{id}"
         headers = {
@@ -379,11 +401,18 @@ class SaturnChatApp:
             description="Uses the item in the current location.",
         )
 
+    def send_group_message(self, group_chat: GroupChat, message):
+        """Send a message to all participants in a group chat."""
+        for participant in group_chat.agents:
+            participant.send(message, self.explorer, request_reply=False) 
+
+
     def update_group_chat_participants(self):
         """Update the group chat participants based on current location NPCs."""
         current_npcs = self.rpg_maze.get_npcs_at_location()
         current_participants = [self.saturnbot, self.explorer] + current_npcs
-        self.group_chat.update_participants(current_participants)
+        # Directly assign the participants attribute
+        self.group_chat.agents = current_participants
 
     def move_player_and_update_chat(self, direction):
         """Move player and update chat based on new location."""
@@ -391,48 +420,70 @@ class SaturnChatApp:
         self.update_group_chat_participants()  # Update participants after moving
         return move_result
     
-    def setup_group_chat(self):
-        """Initial setup of the group chat with dynamic participants."""
-        initial_npcs = self.rpg_maze.get_npcs_at_location()
-        if initial_npcs:
-            initial_participants = [self.saturnbot, self.explorer] + initial_npcs
-        else:
-            initial_participants = [self.saturnbot, self.explorer]
-        self.group_chat = GroupChat(
-            initial_participants,
-            [],
-            speaker_selection_method='auto',
-            max_round=30
-        )
-        self.group_chat_manager = GroupChatManager(groupchat=self.group_chat, llm_config=gpt4_config)
 
 
-    def custom_speaker_selection_func(
-        self, last_speaker: Agent, groupchat: GroupChat
-    ) -> Union[Agent, Literal["auto", "manual", "random", "round_robin"], None]:
-        # Custom logic to select who speaks next based on the last speaker and the conversation turn
+
+
+    def custom_speaker_selection_func(self, last_speaker: Agent, groupchat: GroupChat) -> Union[Agent, Literal["auto", "manual", "random", "round_robin"], None]:
+        """
+        Custom logic to select who speaks next based on the last speaker and the conversation turn, including handling Legends.
+        """
+        # If the last speaker was the explorer, let the SaturnBot provide some context or guidance.
         if last_speaker == self.explorer:
             return self.saturnbot
-        elif last_speaker == self.legend:
-            return self.explorer  
-        elif last_speaker == self.saturnbot:
-            return self.legend  
-        return None  # Fallback case
 
+        # If the last speaker was the SaturnBot, check if there are Legends to speak next.
+        elif last_speaker == self.saturnbot:
+            # Check for presence of Legends in the current group chat.
+            legends_present = [legend for legend in self.legends if legend in groupchat.agents]
+            if legends_present:
+                # If Legends are present, let one of them speak next.
+                # Here, you can decide to either select a specific Legend based on your game's logic or randomly.
+                return legends_present[0]  # This example selects the first Legend for simplicity.
+            
+            # If no Legends are present, check for NPCs.
+            npcs = self.rpg_maze.get_npcs_at_location()
+            if npcs:
+                return random.choice(npcs)
+            else:
+                return self.explorer
+
+        # If the last speaker was one of the Legends, check if there are NPCs to respond.
+        elif last_speaker in self.legends:
+            npcs = self.rpg_maze.get_npcs_at_location()
+            if npcs:
+                return random.choice(npcs)
+            else:
+                return self.explorer
+
+        # If the last speaker was one of the NPCs, the conversation should logically return to the explorer.
+        elif last_speaker in self.rpg_maze.get_npcs_at_location():
+            return self.explorer
+
+        # If none of the above conditions are met, maintain a default or fallback behavior.
+        return "round_robin"  # This could be adjusted to return 'None' or a specific default agent.
+
+            
+    
     def initiate_chat(self, message):
-        # Send RPG intro messages as the first conversation piece
-        # self.legend.send(
-        #                 "Hi, I'm Oberon, a Legend in the Saturn Series Universe. Ready to explore?",
-        #                 self.saturnbot,
-        #                 request_reply=False)
-        self.saturnbot.send(
-                        self.rpg_maze.intro_maze(), 
-                        self.explorer, 
-                        request_reply=False)
-        
-        self.explorer.initiate_chat(
-                        self.group_chat_manager, 
-                        message=message)
+        intro_message = self.rpg_maze.intro_maze()
+        self.saturnbot.send(intro_message, self.explorer, request_reply=False)
+
+        self.update_group_chat_participants()
+
+        # Create and configure a new GroupChat instance
+        self.group_chat = GroupChat([self.saturnbot, self.explorer] + self.rpg_maze.get_npcs_at_location(), [], max_round=1000, speaker_selection_method='auto')
+
+        # Use the GroupChatManager to handle the chat session
+        self.group_chat_manager.run_chat(
+            config=self.group_chat,
+            sender=self.explorer,  # Assuming the explorer initiates the chat
+            messages=[{"content": message, "role": self.explorer}]
+        )
+
+
+
+
 
 ############################
 # Run the chat application #
