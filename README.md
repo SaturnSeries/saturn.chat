@@ -38,8 +38,8 @@ Saturn.chat integrates the AutoGen framework to advance the development of Large
   - Creating NPCs with complex AI to offer quests, unfold lore, and present interactive challenges, further immersing users in the Saturn.chat universe.
 
 - [ ] **Legend Companion Development**
-  - **Conversational Interactions**: Enabling users to engage in meaningful conversations with their Legend NFT companions.
-  - **Activity Participation**: Allowing Legend NFTs to partake in activities, creating a companion experience that's both interactive and rewarding.
+  - [x] **Conversational Interactions**: Enabling users to engage in meaningful conversations with their Legend NFT companions.
+  - [ ] **Activity Participation**: Allowing Legend NFTs to partake in activities, creating a companion experience that's both interactive and rewarding.
 
 ### Future Directions
 
