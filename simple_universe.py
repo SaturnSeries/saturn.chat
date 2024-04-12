@@ -79,14 +79,21 @@ class MazeExplorer:
             descriptions.append("There is nothing of interest here.")
 
         # Check if there is an NPC in this cell
-        if cell.npc:
-            descriptions.append(f"You encounter a character: {cell.npc.name}. {cell.npc.system_message}")
+        if cell.npcs:
+            for npc in cell.npcs:
+                descriptions.append(f"You encounter a character: {npc.name}. {npc.system_message}")
 
         # Combine descriptions of paths, items, and NPCs
         location_description = f"You are now at location ({x}, {y}). {paths}"
         location_description += "\n" + "\n".join(descriptions)
         
         return location_description
+    
+    def get_npcs_at_location(self):
+        """Retrieve NPCs present at the current location."""
+        x, y = self.current_location
+        cell = self.maze.maze_grid[x][y]
+        return cell.npcs
 
 
 
@@ -359,16 +366,34 @@ class SaturnChatApp:
             name="use_item",
             description="Uses the item in the current location.",
         )
-        
+
+    def update_group_chat_participants(self):
+        """Update the group chat participants based on current location NPCs."""
+        current_npcs = self.rpg_maze.get_npcs_at_location()
+        current_participants = [self.saturnbot, self.explorer] + current_npcs
+        self.group_chat.update_participants(current_participants)
+
+    def move_player_and_update_chat(self, direction):
+        """Move player and update chat based on new location."""
+        move_result = self.rpg_maze.move_player(direction)
+        self.update_group_chat_participants()  # Update participants after moving
+        return move_result
+    
     def setup_group_chat(self):
-        # All agents are added to the group chat, ensuring they can send and receive messages
+        """Initial setup of the group chat with dynamic participants."""
+        initial_npcs = self.rpg_maze.get_npcs_at_location()
+        if initial_npcs:
+            initial_participants = [self.saturnbot, self.explorer] + initial_npcs
+        else:
+            initial_participants = [self.saturnbot, self.explorer]
         self.group_chat = GroupChat(
-            [self.saturnbot, self.explorer] + self.legends,  # Include all relevant agents here
-            [],                                            # Message history is empty to start
-            speaker_selection_method='auto',           # Here we pass the custom speaker selection function
+            initial_participants,
+            [],
+            speaker_selection_method='auto',
             max_round=30
         )
         self.group_chat_manager = GroupChatManager(groupchat=self.group_chat, llm_config=gpt4_config)
+
 
     def custom_speaker_selection_func(
         self, last_speaker: Agent, groupchat: GroupChat
