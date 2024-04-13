@@ -173,7 +173,7 @@ class MazeExplorer:
         x, y = self.current_location
         cell: Cell = self.maze.maze_grid[x][y]
         if cell.activities:
-            return cell.activities[0].interact()
+            return cell.activities[0].perform_activity()
         else:
             return "There is no activity here to interact with."
 
@@ -512,6 +512,9 @@ class SaturnChatApp:
             sender=self.explorer,  # Assuming the explorer initiates the chat
             messages=[{"content": message, "role": self.explorer}]
         )
+
+
+
 
 
 ############################
