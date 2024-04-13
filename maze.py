@@ -9,6 +9,21 @@ logging.basicConfig(
     level=logging.CRITICAL, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
+#########################
+# Custom Activity Class #
+#########################
+
+class Activity:
+    def __init__(self, description, execute):
+        self.description = description
+        self.execute = execute  # This is a function that performs the activity
+        self.interact = execute  
+    def perform_activity(self):
+        """Perform the activity and return the result of the execution."""
+        return self.execute()
+
+
+
 #####################
 # Custom Item Class #
 #####################
@@ -60,10 +75,14 @@ class Cell:
         self.x = x
         self.y = y
         self.walls = {"N": True, "S": True, "E": True, "W": True}
+        self.item = None
+        self.npcs = []
         self.visited = False
-        self.state = 4  # Default state is 4 for undiscovered
-        self.item = None  # Initially no item
-        self.npcs = []   # Initially no NPC
+        self.activities = []  # New list to hold activities
+
+    def place_activity(self, activity):
+        self.activities.append(activity)
+
 
     def place_item(self, item):
         self.item = item
@@ -81,6 +100,7 @@ class Maze:
         self.finish_point = (width - 2, height - 2)
         self.generate_maze()
         self.place_starting_loot()
+        self.setup_activities()
         if npcs:
             self.place_npcs(npcs)  
 
@@ -118,6 +138,16 @@ class Maze:
                 neighbour_cell.visited = True
                 neighbour_cell.state = 0  # Mark as part of the path
                 stack.append(neighbour_cell)
+
+
+    def setup_activities(self):
+        # Example activity setup
+        mining_activity = Activity(
+            "Mine for rare crystals",
+            lambda: "You found some rare crystals!" if random.random() > 0.5 else "No crystals here."
+        )
+        # Place the activity in the starting location
+        self.maze_grid[self.start_point[0]][self.start_point[1]].place_activity(mining_activity)
 
 
     # def populate_items(self, prob):
@@ -241,4 +271,3 @@ class Maze:
 
         # Print the maze representation
         print(maze_representation)
-
