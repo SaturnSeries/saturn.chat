@@ -1,26 +1,78 @@
 import random
+import requests
+import os
 import logging
+
 
 from autogen import (Agent, ConversableAgent, GroupChat, GroupChatManager,
                      UserProxyAgent, config_list_from_json)
+import poap
+import config
 
 # Set up basic configuration for logging
 logging.basicConfig(
     level=logging.CRITICAL, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-#########################
-# Custom Activity Class #
-#########################
+###########################
+# Custom Activity Classes #
+###########################
+
+class Activity:
+    def __init__(self, description, execute, success_action=None):
+        self.description = description
+        self.execute = execute  # This function performs the activity and returns success status
+        self.success_action = success_action  # Optional: Function to perform on success
+
+    def perform_activity(self):
+        """Perform the activity and execute success action if successful."""
+        result = self.execute()
+        if "success" in result.lower():  # Check for success keyword in result
+            if self.success_action:
+                action_result = self.success_action()
+                result += " " + action_result
+        return result
+
 
 class Activity:
     def __init__(self, description, execute):
         self.description = description
-        self.execute = execute  # This is a function that performs the activity
-        self.interact = execute  
+        self.execute = execute
+
     def perform_activity(self):
-        """Perform the activity and return the result of the execution."""
         return self.execute()
+
+class POAPActivity(Activity):
+    def __init__(self, description, qr_hash, fetch_secret_func):
+        super().__init__(description, self.claim_poap)
+        self.qr_hash = qr_hash
+        self.fetch_secret_func = fetch_secret_func
+        self.api_key = config.poap_api_key
+        self.secret = None
+
+    def claim_poap(self):
+        if not self.secret:
+            self.secret = self.fetch_secret_func()
+        url = "https://api.poap.tech/actions/claim-qr"
+        payload = {
+            "sendEmail": False,
+            "address": config.eth_address,
+            "qr_hash": self.qr_hash,
+            "secret": self.secret
+        }
+        headers = {
+            "accept": "application/json",
+            "content-type": "application/json",
+            "x-api-key": self.api_key
+        }
+        response = requests.post(url, json=payload, headers=headers)
+        return "POAP claimed successfully!" if response.status_code == 200 else f"Failed to claim POAP {response.text}"
+
+    def fetch_poap(self):
+        url = "https://api.poap.tech/actions/claim-qr"
+        headers = {"accept": "application/json", "x-api-key": self.api_key}
+        response = requests.get(url, headers=headers)
+        return response.json() if response.status_code == 200 else "Failed to fetch POAP data"
 
 
 
@@ -140,16 +192,17 @@ class Maze:
                 stack.append(neighbour_cell)
 
 
+
     def setup_activities(self):
-        # Example activity setup
-        mining_activity = Activity(
-            "Mine for rare crystals",
-            lambda: "You found some rare crystals!" if random.random() > 0.5 else "No crystals here."
-        )
-        # Place the activity in the starting location
-        self.maze_grid[self.start_point[0]][self.start_point[1]].place_activity(mining_activity)
-
-
+        poap_hashes = poap.load_poap_hashes("mining_links.txt")
+        if poap_hashes:
+            first_hash = poap_hashes.pop(0)  # Take the first hash from the list
+            poap_activity = POAPActivity(
+                "Claim a special POAP for discovering a hidden chamber!",
+                first_hash,
+                poap.fetch_secret
+            )
+            self.maze_grid[self.start_point[0]][self.start_point[1]].place_activity(poap_activity)
     # def populate_items(self, prob):
     #     # Populating items with a certain probability in each cell
     #     items = [
