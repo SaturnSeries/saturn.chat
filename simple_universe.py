@@ -61,6 +61,7 @@ class MazeExplorer:
         directions = []
         descriptions = []
 
+        print(str(cell))
         # Check for available directions
         if not cell.walls["N"] and y > 0:
             directions.append("North")
@@ -82,6 +83,11 @@ class MazeExplorer:
         if cell.npcs:
             for npc in cell.npcs:
                 descriptions.append(f"You encounter a character: {npc.name}. {npc.system_message}")
+
+        # Describing activities
+        for activity in cell.activities:
+            descriptions.append(f"Activity available: {activity.description}")
+
 
         # Combine descriptions of paths, items, and NPCs
         location_description = f"You are now at location ({x}, {y}). {paths}"
@@ -161,13 +167,22 @@ class MazeExplorer:
             return cell.item.use_item()
         else:
             return "There is no item here to use."
+        
+    @annotate_self
+    def interact_with_activity(self):
+        x, y = self.current_location
+        cell: Cell = self.maze.maze_grid[x][y]
+        if cell.activities:
+            return cell.activities[0].interact()
+        else:
+            return "There is no activity here to interact with."
 
 ######################################
 # Custom ConversableAgent Subclasses #
 ######################################
 
 gpt4_config = {
-    "cache_seed": random.randint(0, 9999999999999999),
+    "cache_seed": 1 ,# random.randint(0, 9999999999999999),
     "temperature": 0,
     "config_list": config_list_from_json("llm_config.json"),
     "timeout": 120,
@@ -194,6 +209,12 @@ class SaturnBot(ConversableAgent):
             return self.rpg_instance.display_maze()
         elif tool_name == "get_location_description":
             return self.rpg_instance.get_location_description()
+        elif tool_name == "inspect_item":
+            return self.rpg_instance.inspect_item()
+        elif tool_name == "use_item":
+            return self.rpg_instance.use_item()
+        elif tool_name == "interact_with_activity":
+            return self.rpg_instance.interact_with_activity()
         else:
             return "Unknown tool invocation."
 
@@ -353,6 +374,9 @@ class SaturnChatApp:
         def use_item_wrapper() -> str:
             return self.rpg_maze.use_item()
         
+        def interact_with_activity_wrapper() -> str:
+            return self.rpg_maze.interact_with_activity()
+        
         register_function(
             move_player_wrapper,
             caller=self.saturnbot,
@@ -399,6 +423,14 @@ class SaturnChatApp:
             executor=self.explorer,
             name="use_item",
             description="Uses the item in the current location.",
+        )
+
+        register_function(
+            interact_with_activity_wrapper,
+            caller=self.saturnbot,
+            executor=self.explorer,
+            name="interact_with_activity",
+            description="Interacts with the activity in the current location.",
         )
 
     def send_group_message(self, group_chat: GroupChat, message):
@@ -482,13 +514,10 @@ class SaturnChatApp:
         )
 
 
-
-
-
 ############################
 # Run the chat application #
 ############################
 
 maze_app = SaturnChatApp()
 # maze_app.initiate_chat("Hello! Who am I talking to right now? Who is present in this conversation so far?")
-maze_app.initiate_chat("display the maze??")
+maze_app.initiate_chat("interact with the activity")
