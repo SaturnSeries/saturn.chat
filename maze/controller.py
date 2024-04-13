@@ -56,6 +56,7 @@ class MazeController:
     def get_current_position(self):
         return self.get_location_description()
 
+
     def get_location_description(self):
         """Provide a description of the current location, possible paths, and any items or NPCs present."""
         x, y = self.current_location
@@ -96,7 +97,7 @@ class MazeController:
         location_description += "\n" + "\n".join(descriptions)
         
         return location_description
-    
+
     def get_npcs_at_location(self):
         """Retrieve NPCs present at the current location."""
         x, y = self.current_location
