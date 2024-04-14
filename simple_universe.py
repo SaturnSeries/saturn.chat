@@ -1,104 +1,25 @@
 import os
 import logging
 import random
-from autogen import register_function
-from typing import Literal, Union, Callable, get_type_hints, Tuple
+
+from typing import Literal, Union
 import requests
 import json
+from agents import NPC, Legend, SaturnBot
 from maze.controller import MazeController
-import config
 from dotenv import load_dotenv
 
-load_dotenv()
 # Custom imports
-from autogen import (Agent, ConversableAgent, GroupChat, GroupChatManager,
-                     UserProxyAgent, config_list_from_json)
+from agents.config import gpt4_config
+from autogen import (Agent, GroupChat, GroupChatManager,
+                     UserProxyAgent, register_function)
 
-
-# import maze item and cell classes from the models package
-from maze.models.item import Item
-from maze.models.cell import Cell
-from maze.models.activity import Activity
+load_dotenv()
 
 # Set up basic configuration for logging
 logging.basicConfig(
     level=logging.CRITICAL, format="%(asctime)s - %(levelname)s - %(message)s"
 )
-
-
-######################################
-# Custom ConversableAgent Subclasses #
-######################################
-
-gpt4_config = {
-    "cache_seed": 1 ,# random.randint(0, 9999999999999999),
-    "temperature": 0,
-    "config_list": config_list_from_json("llm_config.json"),
-    "timeout": 120,
-}
-
-class SaturnBot(ConversableAgent):
-    def __init__(self, name, llm_config, system_message, rpg_maze_instance: MazeController):
-        super().__init__(
-            name=name,
-            llm_config=llm_config,
-            system_message=system_message,
-            human_input_mode="NEVER"
-        )
-        self.rpg_instance = rpg_maze_instance
-        logging.warning("SaturnBot initialized with RPG instance.")
-
-    def on_tool_invocation(self, tool_name, *args, **kwargs):
-        if tool_name == "move_player":
-            direction = kwargs.get("direction")
-            return self.rpg_instance.move_player(direction)
-        elif tool_name == "get_current_position":
-            return self.rpg_instance.get_current_location_info()
-        elif tool_name == "display_maze":
-            return self.rpg_instance.display_maze()
-        elif tool_name == "get_location_description":
-            return self.rpg_instance.get_location_description()
-        elif tool_name == "inspect_item":
-            return self.rpg_instance.inspect_item()
-        elif tool_name == "use_item":
-            return self.rpg_instance.use_item()
-        elif tool_name == "interact_with_activity":
-            return self.rpg_instance.interact_with_activity()
-        else:
-            return "Unknown tool invocation."
-
-class Legend(ConversableAgent):
-    def __init__(self, name, llm_config, system_message):
-        super().__init__(
-            name=name,
-            llm_config=llm_config,
-            system_message=system_message,
-            human_input_mode="NEVER"
-        )
-
-class NPC(ConversableAgent):
-    def __init__(self, name, llm_config, system_message, backstory, dialogues, explorer):
-        super().__init__(
-            name=name,
-            llm_config=llm_config,
-            system_message=system_message,
-            human_input_mode="NEVER"
-        )
-        self.backstory = backstory
-        self.dialogues = dialogues
-        self.dialogue_index = 0
-        self.explorer = explorer  # Add explorer as an attribute
-
-    def send_initial_greeting(self):
-        # Send initial greeting to the explorer
-        self.send(self.backstory, self.explorer)
-
-    def advance_dialogue(self):
-        if self.dialogue_index < len(self.dialogues):
-            self.send(self.dialogues[self.dialogue_index], self.explorer)
-            self.dialogue_index += 1
-        else:
-            self.send("I have told you all I know.", self.explorer)
 
 
 
@@ -136,7 +57,7 @@ class SaturnChatApp:
         )
         # Pass the NPC list to MazeExplorer
         self.rpg_maze = MazeController(10, 10, npcs=[self.guardian_npc])
-
+        # print(f"Maze created with Guardian NPC. {self.rpg_maze.maze.npcs}")
         # Agent 2
         self.saturnbot = SaturnBot(
             name="SaturnBot",
@@ -163,8 +84,8 @@ class SaturnChatApp:
             self.legends.append(legend)  # Append to the list
             
         self.register_tools() 
-        self.group_chat = GroupChat([self.explorer, self.saturnbot], [], max_round=1000, speaker_selection_method="auto")
-        self.initial_group_chat = GroupChat([self.explorer] + [self.saturnbot] + [self.guardian_npc], [], max_round=1000, speaker_selection_method="auto")
+        self.group_chat = GroupChat([self.explorer, self.saturnbot], [], max_round=1000, speaker_selection_method="round_robin")
+        self.initial_group_chat = GroupChat([self.explorer] + [self.saturnbot] + [self.guardian_npc], [], max_round=1000, speaker_selection_method="round_robin")
         self.group_chat_manager = GroupChatManager(groupchat=self.initial_group_chat)
 
         self.update_group_chat_participants()  # Initialize group chat participants based on initial NPC locations
@@ -300,10 +221,6 @@ class SaturnChatApp:
         move_result = self.rpg_maze.move_player(direction)
         self.update_group_chat_participants()  # Update participants after moving
         return move_result
-    
-
-
-
 
     def custom_speaker_selection_func(self, last_speaker: Agent, groupchat: GroupChat) -> Union[Agent, Literal["auto", "manual", "random", "round_robin"], None]:
         """
@@ -353,7 +270,7 @@ class SaturnChatApp:
         self.update_group_chat_participants()
 
         # Create and configure a new GroupChat instance
-        self.group_chat = GroupChat([self.saturnbot, self.explorer] + self.rpg_maze.get_npcs_at_location(), [], max_round=1000, speaker_selection_method='auto')
+        self.group_chat = GroupChat([self.saturnbot, self.explorer] + self.rpg_maze.get_npcs_at_location(), [], max_round=1000, speaker_selection_method='round_robin')
 
         # Use the GroupChatManager to handle the chat session
         self.group_chat_manager.run_chat(
@@ -369,4 +286,4 @@ class SaturnChatApp:
 
 maze_app = SaturnChatApp()
 # maze_app.initiate_chat("Hello! Who am I talking to right now? Who is present in this conversation so far?")
-maze_app.initiate_chat("interact with the activity")
+maze_app.initiate_chat("where am i?")
