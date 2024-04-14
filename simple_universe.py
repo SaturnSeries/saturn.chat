@@ -11,8 +11,8 @@ from dotenv import load_dotenv
 
 # Custom imports
 from agents.config import gpt4_config
-from autogen import (Agent, ConversableAgent, GroupChat, GroupChatManager,
-                     UserProxyAgent, config_list_from_json, register_function)
+from autogen import (Agent, GroupChat, GroupChatManager,
+                     UserProxyAgent, register_function)
 
 load_dotenv()
 
@@ -57,7 +57,7 @@ class SaturnChatApp:
         )
         # Pass the NPC list to MazeExplorer
         self.rpg_maze = MazeController(10, 10, npcs=[self.guardian_npc])
-
+        # print(f"Maze created with Guardian NPC. {self.rpg_maze.maze.npcs}")
         # Agent 2
         self.saturnbot = SaturnBot(
             name="SaturnBot",
@@ -286,4 +286,4 @@ class SaturnChatApp:
 
 maze_app = SaturnChatApp()
 # maze_app.initiate_chat("Hello! Who am I talking to right now? Who is present in this conversation so far?")
-maze_app.initiate_chat("interact with the activity")
+maze_app.initiate_chat("where am i?")

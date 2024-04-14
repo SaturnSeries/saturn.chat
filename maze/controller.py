@@ -3,6 +3,12 @@ from typing import Literal, Union, Callable, get_type_hints, Tuple
 
 from maze.models.cell import Cell
 from maze.models.maze import Maze  # Adjust if Maze class location is changed
+import logging 
+
+logging.basicConfig(
+    level=logging.CRITICAL, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 
 
 # from maze import Maze, Item, Cell
@@ -48,6 +54,16 @@ class MazeController:
         # Directly use the Maze class for creating the maze
         self.maze = Maze(width, height, npcs=npcs)
         self.current_location = self.maze.start_point  # instead of self.get_random_start()
+        # check if the list has npcs
+        print(f"NPCs: {npcs}")
+        if npcs:
+            # Initialize the first npc in the starting location    
+            self.maze.maze_grid[self.current_location[0]][self.current_location[1]].npcs.append(npcs[0])
+            # Initialize the rest of the npcs in random locations
+            for npc in npcs[1:]:
+                x, y = self.get_random_location()
+                self.maze.maze_grid[x][y].npcs.append(npc)
+                npc.send_initial_greeting()
 
     def intro_maze(self):
         """Introduce the maze to the player and show available moves."""
@@ -63,8 +79,17 @@ class MazeController:
         cell = self.maze.maze_grid[x][y]
         directions = []
         descriptions = []
-
+        print("Current Position:")
+        print(f"({x}, {y})")
+        print("Current Cell:")
         print(str(cell))
+        print("Current Cell NPCS:")
+        print(str(cell.npcs))
+
+        # Debugging: Output current cell coordinates and check for NPCs
+        logging.critical(f"Current location: ({x}, {y})")
+        logging.critical(f"NPCs at current location: {cell.npcs}")
+
         # Check for available directions
         if not cell.walls["N"] and y > 0:
             directions.append("North")

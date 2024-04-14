@@ -1,7 +1,7 @@
 import random
 import logging
 
-from . import Activity, Cell, Item
+from . import POAPActivity, Cell, Item
 # Set up basic configuration for logging
 logging.basicConfig(
     level=logging.CRITICAL, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -75,9 +75,9 @@ class Maze:
 
     def setup_activities(self):
         # Example activity setup
-        mining_activity = Activity(
+        mining_activity = POAPActivity(
             "Mine for rare crystals",
-            lambda: "You found some rare crystals!" if random.random() > 0.5 else "No crystals here."
+            # lambda: "You found some rare crystals!" if random.random() > 0.5 else "No crystals here.",
         )
         # Place the activity in the starting location
         self.maze_grid[self.start_point[0]][self.start_point[1]].place_activity(mining_activity)
