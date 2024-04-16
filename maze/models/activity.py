@@ -1,85 +1,131 @@
 import requests
 import os
+import logging
 from dotenv import load_dotenv
 
+# Initialize environment variables and logging
 load_dotenv()
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class Activity:
     def __init__(self, description, execute):
         self.description = description
-        self.execute = execute  # This is a function that performs the activity
+        self.execute = execute  # Function to perform activity
         self.interact = execute  
 
     def perform_activity(self):
-        """Perform the activity and return the result of the execution."""
+        """ Wrapper to execute the activity function. """
         return self.execute()
 
 class POAPActivity(Activity):
-    def __init__(self, description):
+    def __init__(self, description, links_file="links.txt"):
         super().__init__(description, self.claim_poap)
         self.api_key = os.getenv("POAP_API_KEY")
+        self.wallet_address = os.getenv("ETH_WALLET_ADDRESS")
+        self.links_file = links_file
         self.secret = None
-        self.qr_hash = None  # Will be dynamically loaded
+        self.qr_hash = None
+        self.access_token = None
 
-    def claim_poap(self):
-        # Dynamically load the QR hash here (could be from a secure API or encrypted storage)
-        self.qr_hash = self.fetch_dynamic_qr_hash()
-        print(f"QR Hash: {self.qr_hash}")
-        self.secret = self.fetch_poap_secret(self.qr_hash)
-        print(f"Secret: {self.secret}")
 
-        if self.qr_hash and self.secret:
-            return self.post_claim_request()
+    def get_auth_token(self):
+        """Fetch the auth token using client credentials."""
+        url = 'https://auth.accounts.poap.xyz/oauth/token'
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "audience": "https://api.poap.tech",
+            "grant_type": "client_credentials",
+            "client_id": os.getenv("POAP_CLIENT_ID"),
+            "client_secret": os.getenv("POAP_CLIENT_SECRET")
+        }
+        response = requests.post(url, json=payload, headers=headers)
+        logging.debug(f"Token request payload: {payload}")
+        if response.status_code == 200:
+            logging.info("Auth token fetched successfully.")
+            return response.json().get('access_token')
         else:
-            return "Failed to load necessary claim details."
-
-    def fetch_dynamic_qr_hash(self):
-        """
-        Fetch the QR hash required to claim the POAP using the poap/links.txt file.
-        It deletes the link from the file after a successful claim.
-        """ 
-        with open("/Users/cassini/pycode/saturn.chat/poap/links.txt", "r") as f:
-            lines = f.readlines()
-        if lines:
-            qr_hash = lines[0].strip()
-            with open("poap/links.txt", "w") as f:
-                f.writelines(lines[1:])
-            return qr_hash
-
-    def fetch_poap_secret(self, qr_hash):
-        """Fetch the secret required to claim the POAP using the POAP API."""
-        url = f"https://api.poap.tech/actions/claim-qr?qr_hash={qr_hash}"
-        headers = {"accept": "application/json", "x-api-key": self.api_key}
-        print(url)
-        print(headers)
-        response = requests.get(url, headers=headers)
-        print(response.text)
-        if response.status_code == 200 and 'secret' in response.json():
-            return response.json()['secret']
-        else:
+            logging.error(f"Failed to fetch auth token: {response.text}")
             return None
 
-    def post_claim_request(self):
-        """Post a claim request to the POAP API using the fetched secret."""
-        url = "https://api.poap.tech/actions/claim-qr"
-        payload = {
-            "sendEmail": True,
-            "address": os.getenv("ETH_WALLET_ADDRESS"),
-            "qr_hash": self.qr_hash,
-            "secret": self.secret
+    def fetch_poap_claim_qr(self, access_token, qr_hash):
+        """Fetch POAP claim using the provided access token and qr_hash."""
+        url = f"https://api.poap.tech/actions/claim-qr?qr_hash={qr_hash}"
+        headers = {
+            "accept": "application/json",
+            "authorization": f"Bearer {access_token}",
+            "x-api-key": os.getenv("POAP_API_KEY")
         }
+        response = requests.get(url, headers=headers)
+        logging.debug(f"Fetching POAP with QR hash: {qr_hash}")
+        if response.status_code == 200:
+            logging.info("POAP claim data fetched successfully.")
+            return response.json()
+        else:
+            logging.error(f"Failed to fetch POAP claim: {response.text}")
+            return None
+
+    def finalize_poap_claim(self, qr_hash, secret, access_token):
+        """Send request to finalize POAP claim."""
+        url = "https://api.poap.tech/actions/claim-qr"
         headers = {
             "accept": "application/json",
             "content-type": "application/json",
-            "x-api-key": self.api_key
+            "authorization": f"Bearer {access_token}",
+            "x-api-key": os.getenv("POAP_API_KEY")
+        }
+        payload = {
+            "sendEmail": True,
+            "address": os.getenv("ETH_WALLET_ADDRESS"),
+            "qr_hash": qr_hash,
+            "secret": secret
         }
         response = requests.post(url, json=payload, headers=headers)
-        print(response.text)
-        return "POAP claimed successfully!" if response.status_code == 200 else f"Failed to claim POAP {response.text}"
+        logging.debug(f"Finalizing POAP claim with payload: {payload}")
+        if response.status_code == 200:
+            logging.info("POAP claimed successfully!")
+            return response.json()
+        else:
+            logging.error(f"Failed to claim POAP: {response.text}")
+            return None
 
-# Example of setting up activities
-def setup_activities(maze_grid, start_point):
-    # Example activity setup
-    mining_activity = POAPActivity("Mine for rare crystals")
-    # Place the activity in the starting location
-    maze_grid[start_point[0]][start_point[1]].place_activity(mining_activity)
+    def fetch_dynamic_qr_hash(self):
+        """Fetch and remove the first QR hash from the local file."""
+        logging.info("Fetching dynamic QR hash.")
+        try:
+            with open("links.txt", "r") as f:
+                lines = f.readlines()
+            if not lines:
+                logging.warning("No QR hashes found in the file.")
+                return None
+            url = lines[0].strip()
+            qr_hash = url.split("/")[-1]
+            with open("links.txt", "w") as f:
+                f.writelines(lines[1:])
+            logging.debug(f"Dynamic QR hash fetched: {qr_hash}")
+            return qr_hash
+        except FileNotFoundError:
+            logging.error("QR hash file not found.")
+            return None
+        except Exception as e:
+            logging.error(f"Error reading QR hash: {str(e)}")
+            return None
+        
+    def claim_poap(self):
+        access_token = self.get_auth_token()
+        if access_token:
+            qr_hash = self.fetch_dynamic_qr_hash()
+            if qr_hash:
+                claim_data = self.fetch_poap_claim_qr(access_token, qr_hash)
+                if claim_data and 'secret' in claim_data:
+                    final_result = self.finalize_poap_claim(qr_hash, claim_data['secret'], access_token)
+                    logging.info(f"Final Claim Result: {final_result}")
+                    return final_result
+                else:
+                    logging.error("No secret found to finalize claim.")
+                    return "No secret found to finalize claim."
+            else:
+                logging.error("Failed to fetch a valid QR hash.")
+                return "Failed to fetch a valid QR hash."
+        else:
+            logging.error("No access token obtained.")
+            return "No access token obtained."

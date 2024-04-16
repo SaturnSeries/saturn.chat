@@ -1,7 +1,7 @@
 import os
 import logging
 import random
-
+import copy
 from typing import Literal, Union
 import requests
 import json
@@ -31,37 +31,35 @@ logging.basicConfig(
 class SaturnChatApp:
     def __init__(self, work_dir="./maze"):
         # Instantiate explorer first
+        # Agent 1, User proxy agent for the explorer
         self.explorer = UserProxyAgent(
             name="Explorer",
             system_message="Exploring the maze, executing commands for movement.",
             code_execution_config={"work_dir": work_dir},
         )
-
-
-
-        # Agent 2, User proxy agent for the explorer
-        self.explorer = UserProxyAgent(
-            name="Explorer",
-            system_message="Exploring the maze, executing commands for movement.",
-            code_execution_config={"work_dir": work_dir},
-        )
-        # Agent 1: Guardian
+        # Agent 2: Guardian
         # Create the NPC with explorer passed as an argument
+
+        guardian_llm_config = copy.deepcopy(gpt4_config)
+
         self.guardian_npc = NPC(
             name="Guardian",
-            llm_config=gpt4_config,
+            llm_config=guardian_llm_config,
             system_message="I'm a spectral figure that from the shadows.",
             backstory="Guardian of the ancient labyrinth, keeper of its secrets.",
             dialogues=["Welcome, traveler, to the labyrinth of doom.", "Beware the paths that twist and turn.", "Seek the treasure but watch for traps."],
-            explorer=self.explorer
+            explorer=self.explorer,
         )
         # Pass the NPC list to MazeExplorer
         self.rpg_maze = MazeController(10, 10, npcs=[self.guardian_npc])
         # print(f"Maze created with Guardian NPC. {self.rpg_maze.maze.npcs}")
-        # Agent 2
+        # Agent 3
+
+        saturnbot_llm_config = copy.deepcopy(gpt4_config)
+
         self.saturnbot = SaturnBot(
             name="SaturnBot",
-            llm_config=gpt4_config,
+            llm_config=saturnbot_llm_config,
             system_message="""You are Saturn Bot, you guide the player across a maze and they need to find the exit. 
             You have the possibility to move around, display the map and tell stories about Saturn.
             You do not make up any stories, you only provide information about the maze based on the context of the conversation.
@@ -72,16 +70,19 @@ class SaturnChatApp:
 
 
 
-        # Agent 3-9: Legend Characters
-        self.legends = []  # List to store multiple Legend agents
-        for i in range(1,8):
-            traits = self.get_legend_metadata(i)
-            legend = Legend(
-                name=f"Legend_{i}",  # Give a unique name
-                llm_config=gpt4_config,
-                system_message=f"I am Legend_{i}. I'm in a maze trying to escape. Treasures await in this maze, if we're able to find them. I'll be talking with an explorer, let's explore and get out! \n\n These are my traits: \n\n {traits}"
-            )
-            self.legends.append(legend)  # Append to the list
+#         # Agent 3-9: Legend Characters
+#         legend_llm_config = copy.deepcopy(gpt4_config)
+
+#         self.legends = []  # List to store multiple Legend agents
+#         for i in range(1,8):
+#             traits = self.get_legend_metadata(i)
+#             legend = Legend(
+#                 name=f"Legend_{i}",  # Give a unique name
+#                 llm_config=copy.deepcopy(legend_llm_config)
+# ,
+#                 system_message=f"I am Legend_{i}. I'm in a maze trying to escape. Treasures await in this maze, if we're able to find them. I'll be talking with an explorer, let's explore and get out! \n\n These are my traits: \n\n {traits}"
+#             )
+#             self.legends.append(legend)  # Append to the list
             
         self.register_tools() 
         self.group_chat = GroupChat([self.explorer, self.saturnbot], [], max_round=1000, speaker_selection_method="round_robin")
@@ -286,4 +287,4 @@ class SaturnChatApp:
 
 maze_app = SaturnChatApp()
 # maze_app.initiate_chat("Hello! Who am I talking to right now? Who is present in this conversation so far?")
-maze_app.initiate_chat("where am i?")
+maze_app.initiate_chat("perform the available activity")
