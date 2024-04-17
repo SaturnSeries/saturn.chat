@@ -1,2 +1,6 @@
 python-dotenv
 pyautogen==0.2.23
+fastapi
+uvicorn
+httpx
+pytest

@@ -36,6 +36,7 @@ class SaturnChatApp:
             name="Explorer",
             system_message="Exploring the maze, executing commands for movement.",
             code_execution_config={"work_dir": work_dir},
+            human_input_mode="NEVER"
         )
         # Agent 2: Guardian
         # Create the NPC with explorer passed as an argument
@@ -230,40 +231,50 @@ class SaturnChatApp:
         # If the last speaker was the explorer, let the SaturnBot provide some context or guidance.
         if last_speaker == self.explorer:
             return self.saturnbot
-
-        # If the last speaker was the SaturnBot, check if there are Legends to speak next.
+        # If the last speaker was saturnbot, let the explorer speak next
         elif last_speaker == self.saturnbot:
-            # Check for presence of Legends in the current group chat.
-            legends_present = [legend for legend in self.legends if legend in groupchat.agents]
-            if legends_present:
-                # If Legends are present, let one of them speak next.
-                # Here, you can decide to either select a specific Legend based on your game's logic or randomly.
-                return legends_present[0]  # This example selects the first Legend for simplicity.
-            
-            # If no Legends are present, check for NPCs.
-            npcs = self.rpg_maze.get_npcs_at_location()
-            if npcs:
-                return random.choice(npcs)
-            else:
-                return self.explorer
-
-        # If the last speaker was one of the Legends, check if there are NPCs to respond.
-        elif last_speaker in self.legends:
-            npcs = self.rpg_maze.get_npcs_at_location()
-            if npcs:
-                return random.choice(npcs)
-            else:
-                return self.explorer
-
-        # If the last speaker was one of the NPCs, the conversation should logically return to the explorer.
-        elif last_speaker in self.rpg_maze.get_npcs_at_location():
             return self.explorer
 
-        # If none of the above conditions are met, maintain a default or fallback behavior.
-        return "round_robin"  # This could be adjusted to return 'None' or a specific default agent.
-
-            
+        # If it fails, return None to let the GroupChatManager handle the speaker selection.
+        return None
     
+
+    def process_input(self, input_data: str) -> str:
+        """
+        Process input from WebSocket and return the response.
+        Args:
+            input_data (str): Input data from WebSocket.
+        Returns:
+            str: Response to be sent back to the WebSocket client.
+        """
+        # Assuming generate_reply expects a dictionary with a 'content' key
+        message_dict = {"content": input_data}
+
+        # # Check if the input is a command or general input
+        # if input_data.startswith("move ") or input_data == "display maze" or input_data.startswith("interact"):
+        #     # Handle specific commands as before
+        #     if input_data.startswith("move "):
+        #         direction = input_data.split()[1]
+        #         move_result = self.move_player_and_update_chat(direction)
+        #         return f"Moved {direction}. {move_result}"
+        #     elif input_data == "display maze":
+        #         maze_state = self.rpg_maze.display_maze()
+        #         return f"Maze State:\n{maze_state}"
+        #     elif input_data.startswith("interact"):
+        #         interaction_result = self.rpg_maze.interact_with_activity()
+        #         return f"Interaction result: {interaction_result}"
+        # else:
+            # Use the modified message structure for general replies
+        try:
+            return self.explorer.generate_reply(message_dict)
+        except Exception as e:
+            # Handle or log the exception if needed
+            logging.error(f"Error processing input: {e}")
+            return "Error processing your request."
+
+
+
+
     def initiate_chat(self, message):
         intro_message = self.rpg_maze.intro_maze()
         self.saturnbot.send(intro_message, self.explorer, request_reply=False)
@@ -271,7 +282,7 @@ class SaturnChatApp:
         self.update_group_chat_participants()
 
         # Create and configure a new GroupChat instance
-        self.group_chat = GroupChat([self.saturnbot, self.explorer] + self.rpg_maze.get_npcs_at_location(), [], max_round=1000, speaker_selection_method='round_robin')
+        self.group_chat = GroupChat([self.saturnbot, self.explorer] + self.rpg_maze.get_npcs_at_location(), [], max_round=1000, speaker_selection_method=self.custom_speaker_selection_func)
 
         # Use the GroupChatManager to handle the chat session
         self.group_chat_manager.run_chat(
@@ -285,6 +296,6 @@ class SaturnChatApp:
 # Run the chat application #
 ############################
 
-maze_app = SaturnChatApp()
-# maze_app.initiate_chat("Hello! Who am I talking to right now? Who is present in this conversation so far?")
-maze_app.initiate_chat("perform the available activity")
+# maze_app = SaturnChatApp()
+# # maze_app.initiate_chat("Hello! Who am I talking to right now? Who is present in this conversation so far?")
+# maze_app.initiate_chat("perform the available activity")

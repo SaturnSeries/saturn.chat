@@ -203,4 +203,4 @@ class Maze:
         maze_representation += bottom_row
 
         # Print the maze representation
-        print(maze_representation)
+        return maze_representation
