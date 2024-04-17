@@ -114,7 +114,6 @@ def on_connect(iostream: IOWebsockets) -> None:
         # Agent 2: Guardian
         # Create the NPC with explorer passed as an argument
 
-
     guardian_npc = NPC(
             name="Guardian",
             llm_config={
