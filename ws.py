@@ -57,11 +57,9 @@ def _get_config_list() -> List[Dict[str, str]]:
         {
         "cache_seed": random.randint(0, 9999999999999999),
         "temperature": 0,
-        # "config_list": config_list_from_json("llm_config.json"),
         "timeout": 120,
-
         "model": "gpt-4",
-        "messages": [{"role": "user", "content": "Tell me about yourself.}"}],
+        # "messages": [{"role": "user", "content": "Tell me about yourself.}"}],
         "api_key": os.getenv("OPENAI_API_KEY"),
     },
     ]
@@ -139,7 +137,7 @@ def on_connect(iostream: IOWebsockets) -> None:
             llm_config={
             "config_list": _get_config_list(),
             "stream": True,
-        },
+            },
             system_message="""You are Saturn Bot, you guide the player across a maze and they need to find the exit. 
             You have the possibility to move around, display the map and tell stories about Saturn.
             You do not make up any stories, you only provide information about the maze based on the context of the conversation.
@@ -165,14 +163,17 @@ def on_connect(iostream: IOWebsockets) -> None:
         move_player_wrapper, caller=saturnbot, executor=explorer, description="Move the player in the RPG maze"
     )
     logger.critical(f"on_connect(): Registering the move_player function, {move_player_wrapper}")
-    
+    logger.critical(f"on_connect(): {saturnbot.function_map=}")
+    logger.critical(f"on_connect(): {agent.function_map=}")
+    logger.critical(f"on_connect(): {saturnbot.system_message=}")
     # instantiate a chat
     logger.info(
-        f"on_connect(): Initiating chat with the agent ({agent.name}) and the user proxy ({user_proxy.name}) using the message '{initial_msg}'",
+        f"on_connect(): Initiating chat with the agent ({saturnbot.name}) and the user proxy ({explorer.name}) using the message '{initial_msg}'",
     )
-    user_proxy.initiate_chat(  # noqa: F704
+    explorer.initiate_chat(  # noqa: F704
         saturnbot,
         message=initial_msg,
+        max_turns=3
     )
 
     logger.info("on_connect(): Finished the task successfully.")
