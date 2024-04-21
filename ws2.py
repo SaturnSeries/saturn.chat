@@ -19,7 +19,8 @@ from websockets.exceptions import ConnectionClosedError
 # Load environment variables
 dotenv.load_dotenv()
 
-logging.basicConfig(level=logging.DEBUG)
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Generate configuration for the model
 config_list = [{
@@ -35,8 +36,8 @@ print(config_list[0]["model"])
 # Function that handles WebSocket connections
 def on_connect(iostream: IOWebsockets):
     try:
-        print(f" - on_connect(): Connected to client using IOWebsockets {iostream}", flush=True)
-        print(" - on_connect(): Receiving message from client.", flush=True)
+        logging.critical(f" - on_connect(): Connected to client using IOWebsockets {iostream}")
+        logging.critical(" - on_connect(): Receiving message from client.")
 
         initial_msg = iostream.input()
 
@@ -67,7 +68,7 @@ def on_connect(iostream: IOWebsockets):
 
         with TemporaryDirectory() as cache_path_root:
             with Cache.disk(cache_path_root=cache_path_root) as cache:
-                print(f" - on_connect(): Initiating chat with agent {agent} using message '{initial_msg}'", flush=True)
+                logging.critical(f" - on_connect(): Initiating chat with agent {agent} using message '{initial_msg}'")
                 user_proxy.initiate_chat(
                     agent,
                     message=initial_msg,
@@ -139,7 +140,7 @@ async def websocket_endpoint(websocket: WebSocket):
 @asynccontextmanager
 async def run_websocket_server(app):
     with IOWebsockets.run_server_in_thread(on_connect=on_connect, port=8080) as uri:
-        print(f"Websocket server started at {uri}.", flush=True)
+        logging.critical(f"Websocket server started at {uri}.")
 
         yield
 
