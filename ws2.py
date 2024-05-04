@@ -16,7 +16,7 @@ llm_config={
 }
 
 def handle_response(msg):
-        socketio.emit('message', { "text": msg['content'], "isSender": False, "avatarSrc": "", "complete": True })
+        socketio.emit('message', { "text": msg['content'], "isSender": False, "avatarSrc": "/assets/images/legendsAvatars/578.png", "complete": True })
 
 
 
